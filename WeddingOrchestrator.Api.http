@@ -1,0 +1,6 @@
+@WeddingOrchestrator.Api_HostAddress = http://localhost:5188
+
+GET {{WeddingOrchestrator.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
