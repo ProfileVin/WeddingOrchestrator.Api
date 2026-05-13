@@ -48,6 +48,10 @@ public class WeddingsController : ControllerBase
     public async Task<IActionResult> Finalize(int id) =>
         Ok(await _weddings.FinalizeAsync(id));
 
+    [HttpPost("{id:int}/unfinalize")]
+    public async Task<IActionResult> Unfinalize(int id) =>
+        Ok(await _weddings.UnfinalizeAsync(id));
+
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete(int id)
     {

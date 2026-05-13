@@ -74,10 +74,12 @@ public class WeddingService : IWeddingService
         await _db.SaveChangesAsync();
 
         if (!string.IsNullOrWhiteSpace(dto.GroomName))
-            roles.First(r => r.RoleType == RoleType.Groom).FreeTextName = dto.GroomName;
+            roles.First(r => r.RoleType == RoleType.Groom).PersonId =
+                await FindOrCreatePersonByNameAsync(dto.GroomName);
 
         if (!string.IsNullOrWhiteSpace(dto.BrideName))
-            roles.First(r => r.RoleType == RoleType.Bride).FreeTextName = dto.BrideName;
+            roles.First(r => r.RoleType == RoleType.Bride).PersonId =
+                await FindOrCreatePersonByNameAsync(dto.BrideName);
 
         if (dto.WeddingIntroSongId.HasValue)
             _db.WeddingRoleSongAssignments.Add(new WeddingRoleSongAssignment
@@ -95,22 +97,38 @@ public class WeddingService : IWeddingService
     public async Task<WeddingDto> UpdateRolesAsync(int id, WeddingFamilyTreeDto dto)
     {
         var wedding = await LoadFullWedding(id);
-        if (wedding.IsFinalized)
-            throw new InvalidOperationException("Finalized weddings cannot be edited.");
 
         foreach (var slotInput in dto.Roles)
         {
             var role = wedding.Roles.FirstOrDefault(r => r.RoleType == slotInput.RoleType);
             if (role == null) continue;
 
-            role.PersonId = slotInput.PersonId;
-            role.FreeTextName = slotInput.FreeTextName;
+            var oldPersonId = role.PersonId;
 
-            // Clear existing song assignments when the person changes
-            var existingAssignments = await _db.WeddingRoleSongAssignments
-                .Where(a => a.WeddingRoleId == role.Id)
-                .ToListAsync();
-            _db.WeddingRoleSongAssignments.RemoveRange(existingAssignments);
+            if (slotInput.PersonId.HasValue)
+            {
+                role.PersonId = slotInput.PersonId;
+                role.FreeTextName = null;
+            }
+            else if (!string.IsNullOrWhiteSpace(slotInput.FreeTextName))
+            {
+                role.PersonId = await FindOrCreatePersonByNameAsync(slotInput.FreeTextName);
+                role.FreeTextName = null;
+            }
+            else
+            {
+                role.PersonId = null;
+                role.FreeTextName = null;
+            }
+
+            // Only clear song assignments when the assigned person actually changes
+            if (role.PersonId != oldPersonId)
+            {
+                var existingAssignments = await _db.WeddingRoleSongAssignments
+                    .Where(a => a.WeddingRoleId == role.Id)
+                    .ToListAsync();
+                _db.WeddingRoleSongAssignments.RemoveRange(existingAssignments);
+            }
         }
 
         await _db.SaveChangesAsync();
@@ -120,8 +138,6 @@ public class WeddingService : IWeddingService
     public async Task<WeddingDto> AssignSongsAsync(int id, AssignSongsDto dto)
     {
         var wedding = await LoadFullWedding(id);
-        if (wedding.IsFinalized)
-            throw new InvalidOperationException("Finalized weddings cannot be edited.");
 
         var forbiddenIds = await _conflicts.GetForbiddenSongIdsAsync(id);
 
@@ -160,12 +176,39 @@ public class WeddingService : IWeddingService
         return await GetByIdAsync(id);
     }
 
+    public async Task<WeddingDto> UnfinalizeAsync(int id)
+    {
+        var wedding = await _db.Weddings.FindAsync(id)
+            ?? throw new KeyNotFoundException($"Wedding {id} not found.");
+        wedding.IsFinalized = false;
+        await _db.SaveChangesAsync();
+        return await GetByIdAsync(id);
+    }
+
     public async Task DeleteAsync(int id)
     {
         var wedding = await _db.Weddings.FindAsync(id)
             ?? throw new KeyNotFoundException($"Wedding {id} not found.");
         _db.Weddings.Remove(wedding);
         await _db.SaveChangesAsync();
+    }
+
+    private async Task<int> FindOrCreatePersonByNameAsync(string name)
+    {
+        var trimmed = name.Trim();
+        var existing = await _db.People
+            .FirstOrDefaultAsync(p => (p.FirstName + " " + p.LastName).Trim() == trimmed);
+        if (existing != null) return existing.Id;
+
+        var parts = trimmed.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
+        var person = new Person
+        {
+            FirstName = parts.Length > 0 ? parts[0] : trimmed,
+            LastName = parts.Length > 1 ? parts[1] : string.Empty
+        };
+        _db.People.Add(person);
+        await _db.SaveChangesAsync();
+        return person.Id;
     }
 
     private async Task<Wedding> LoadFullWedding(int id)

@@ -13,6 +13,6 @@ public static class WeddingTitleHelper
         var groomName = groomRole?.Person?.LastName ?? groomRole?.FreeTextName?.Split(' ').LastOrDefault() ?? "(Groom TBD)";
         var brideName = brideRole?.Person?.LastName ?? brideRole?.FreeTextName?.Split(' ').LastOrDefault() ?? "(Bride TBD)";
 
-        return $"{groomName} - {brideName} - {wedding.DateOfWedding:dd MMM yyyy}";
+        return $"{groomName} - {brideName} - {wedding.DateOfWedding:MMM dd, yyyy}";
     }
 }

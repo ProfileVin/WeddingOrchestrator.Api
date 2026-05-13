@@ -10,5 +10,6 @@ public interface IWeddingService
     Task<WeddingDto> UpdateRolesAsync(int id, WeddingFamilyTreeDto dto);
     Task<WeddingDto> AssignSongsAsync(int id, AssignSongsDto dto);
     Task<WeddingDto> FinalizeAsync(int id);
+    Task<WeddingDto> UnfinalizeAsync(int id);
     Task DeleteAsync(int id);
 }
