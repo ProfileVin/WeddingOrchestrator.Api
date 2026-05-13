@@ -5,6 +5,7 @@ namespace WeddingOrchestrator.Api.Services.Interfaces;
 public interface ISongService
 {
     Task<List<SongCategoryDto>> GetAllCategoriesWithSongsAsync();
+    Task<SongCategoryDto> CreateCategoryAsync(CreateSongCategoryDto dto);
     Task<List<SongDto>> GetAllSongsAsync();
     Task<SongDto> GetByIdAsync(int id);
     Task<SongDto> UploadSongAsync(IFormFile file, int categoryId);
