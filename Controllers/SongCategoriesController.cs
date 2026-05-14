@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using WeddingOrchestrator.Api.DTOs.Songs;
 using WeddingOrchestrator.Api.Services.Interfaces;
 
 namespace WeddingOrchestrator.Api.Controllers;
@@ -14,4 +15,8 @@ public class SongCategoriesController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetAll() =>
         Ok(await _songs.GetAllCategoriesWithSongsAsync());
+
+    [HttpPost]
+    public async Task<IActionResult> Create([FromBody] CreateSongCategoryDto dto) =>
+        Ok(await _songs.CreateCategoryAsync(dto));
 }

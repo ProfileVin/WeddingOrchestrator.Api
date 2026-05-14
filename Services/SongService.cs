@@ -29,6 +29,23 @@ public class SongService : ISongService
         return categories.Select(MapCategoryDto).ToList();
     }
 
+    public async Task<SongCategoryDto> CreateCategoryAsync(CreateSongCategoryDto dto)
+    {
+        var maxOrder = await _db.SongCategories.AnyAsync()
+            ? await _db.SongCategories.MaxAsync(c => c.DisplayOrder)
+            : 0;
+
+        var category = new SongCategory
+        {
+            Name = dto.Name.Trim(),
+            DisplayOrder = maxOrder + 1
+        };
+
+        _db.SongCategories.Add(category);
+        await _db.SaveChangesAsync();
+        return MapCategoryDto(category);
+    }
+
     public async Task<List<SongDto>> GetAllSongsAsync()
     {
         var songs = await _db.Songs
