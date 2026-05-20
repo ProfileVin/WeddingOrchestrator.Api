@@ -147,13 +147,16 @@ public class SongService : ISongService
 
     public async Task DeleteSongAsync(int id)
     {
-        var song = await _db.Songs.FindAsync(id)
+        var song = await _db.Songs
+            .Include(s => s.Assignments)
+            .FirstOrDefaultAsync(s => s.Id == id)
             ?? throw new KeyNotFoundException($"Song {id} not found.");
 
         var absolutePath = Path.Combine(_storageRoot, song.RelativeFilePath);
         if (File.Exists(absolutePath))
             File.Delete(absolutePath);
 
+        _db.WeddingRoleSongAssignments.RemoveRange(song.Assignments);
         _db.Songs.Remove(song);
         await _db.SaveChangesAsync();
     }
@@ -187,13 +190,43 @@ public class SongService : ISongService
         });
     }
 
+    public async Task<SongDto> ReplaceFileAsync(int id, IFormFile file)
+    {
+        var song = await _db.Songs.Include(s => s.Category).FirstOrDefaultAsync(s => s.Id == id)
+            ?? throw new KeyNotFoundException($"Song {id} not found.");
+
+        var oldPath = Path.Combine(_storageRoot, song.RelativeFilePath);
+        if (File.Exists(oldPath))
+            File.Delete(oldPath);
+
+        var dir = GetCategoryDir(song.Category.Name);
+        Directory.CreateDirectory(dir);
+        var fileName = $"{Guid.NewGuid():N}_{SanitizeFileName(song.Title)}.docx";
+        var absolutePath = Path.Combine(dir, fileName);
+
+        await using (var fs = new FileStream(absolutePath, FileMode.Create))
+            await file.CopyToAsync(fs);
+
+        var info = new FileInfo(absolutePath);
+        song.RelativeFilePath = Path.GetRelativePath(_storageRoot, absolutePath);
+        song.FileSizeBytes = info.Length;
+        song.LastUpdatedUtc = info.LastWriteTimeUtc;
+
+        await _db.SaveChangesAsync();
+        return MapSongDto(song);
+    }
+
     public async Task SyncFileMetadataAsync()
     {
         var songs = await _db.Songs.ToListAsync();
         foreach (var song in songs)
         {
             var absolutePath = Path.Combine(_storageRoot, song.RelativeFilePath);
-            if (!File.Exists(absolutePath)) continue;
+            if (!File.Exists(absolutePath))
+            {
+                song.FileSizeBytes = 0;
+                continue;
+            }
             var info = new FileInfo(absolutePath);
             song.FileSizeBytes = info.Length;
             song.LastUpdatedUtc = info.LastWriteTimeUtc;

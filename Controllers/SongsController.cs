@@ -38,6 +38,10 @@ public class SongsController : ControllerBase
     public async Task<IActionResult> Update(int id, [FromBody] UpdateSongDto dto) =>
         Ok(await _songs.UpdateSongAsync(id, dto));
 
+    [HttpPut("{id:int}/file")]
+    public async Task<IActionResult> ReplaceFile(int id, [FromForm] IFormFile file) =>
+        Ok(await _songs.ReplaceFileAsync(id, file));
+
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete(int id)
     {

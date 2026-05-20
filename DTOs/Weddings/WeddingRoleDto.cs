@@ -21,6 +21,7 @@ public class SongAssignmentDto
     public int? SongId { get; set; }
     public string? SongTitle { get; set; }
     public string? SongCategoryName { get; set; }
+    public long FileSizeBytes { get; set; }
 }
 
 public class AvailableSongDto
