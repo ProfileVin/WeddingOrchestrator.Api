@@ -177,12 +177,18 @@ namespace WeddingOrchestrator.Api.Migrations
                     b.Property<DateTime>("DateOfWedding")
                         .HasColumnType("datetime2");
 
+                    b.Property<TimeOnly?>("EndTime")
+                        .HasColumnType("time");
+
                     b.Property<bool>("IsFinalized")
                         .HasColumnType("bit");
 
                     b.Property<string>("Location")
                         .HasMaxLength(300)
                         .HasColumnType("nvarchar(300)");
+
+                    b.Property<TimeOnly?>("StartTime")
+                        .HasColumnType("time");
 
                     b.HasKey("Id");
 

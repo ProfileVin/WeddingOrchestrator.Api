@@ -36,6 +36,8 @@ public class WeddingService : IWeddingService
                 Id = w.Id,
                 Title = WeddingTitleHelper.Compute(w),
                 DateOfWedding = w.DateOfWedding,
+                StartTime = w.StartTime,
+                EndTime = w.EndTime,
                 Location = w.Location,
                 IsFinalized = w.IsFinalized,
                 GroomName = groom?.Person?.FullName ?? groom?.FreeTextName ?? string.Empty,
@@ -56,6 +58,8 @@ public class WeddingService : IWeddingService
         var wedding = new Wedding
         {
             DateOfWedding = dto.DateOfWedding,
+            StartTime = dto.StartTime,
+            EndTime = dto.EndTime,
             Location = dto.Location,
             IsFinalized = false,
             CreatedUtc = DateTime.UtcNow
@@ -227,6 +231,8 @@ public class WeddingService : IWeddingService
             Id = w.Id,
             Title = WeddingTitleHelper.Compute(w),
             DateOfWedding = w.DateOfWedding,
+            StartTime = w.StartTime,
+            EndTime = w.EndTime,
             Location = w.Location,
             IsFinalized = w.IsFinalized,
             Roles = w.Roles.OrderBy(r => r.RoleType).Select(r => MapRoleDto(r, conflictReport)).ToList(),
@@ -271,7 +277,8 @@ public class WeddingService : IWeddingService
                 AssignmentSlot = a.AssignmentSlot,
                 SongId = a.SongId,
                 SongTitle = a.Song.Title,
-                SongCategoryName = a.Song.Category.Name
+                SongCategoryName = a.Song.Category.Name,
+                FileSizeBytes = a.Song.FileSizeBytes
             }).ToList(),
             AvailableSongs = availableSongs
         };
