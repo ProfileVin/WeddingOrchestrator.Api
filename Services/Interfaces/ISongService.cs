@@ -11,6 +11,7 @@ public interface ISongService
     Task<SongDto> UploadSongAsync(IFormFile file, int categoryId);
     Task<SongDto> CreateBlankSongAsync(CreateSongDto dto);
     Task<SongDto> UpdateSongAsync(int id, UpdateSongDto dto);
+    Task<SongDto> ReplaceFileAsync(int id, IFormFile file);
     Task DeleteSongAsync(int id);
     Task<(Stream stream, string fileName, string contentType)> DownloadSongAsync(int id);
     Task OpenInWordAsync(int id);
