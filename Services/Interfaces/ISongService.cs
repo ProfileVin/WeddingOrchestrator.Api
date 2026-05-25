@@ -8,7 +8,7 @@ public interface ISongService
     Task<SongCategoryDto> CreateCategoryAsync(CreateSongCategoryDto dto);
     Task<List<SongDto>> GetAllSongsAsync();
     Task<SongDto> GetByIdAsync(int id);
-    Task<SongDto> UploadSongAsync(IFormFile file, int categoryId);
+    Task<SongDto> UploadSongAsync(IFormFile file, int categoryId, string title);
     Task<SongDto> CreateBlankSongAsync(CreateSongDto dto);
     Task<SongDto> UpdateSongAsync(int id, UpdateSongDto dto);
     Task<SongDto> ReplaceFileAsync(int id, IFormFile file);

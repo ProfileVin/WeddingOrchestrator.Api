@@ -9,7 +9,6 @@ public class WeddingRole
     public RoleType RoleType { get; set; }
 
     public int? PersonId { get; set; }
-    public string? FreeTextName { get; set; }
 
     public Wedding Wedding { get; set; } = null!;
     public Person? Person { get; set; }

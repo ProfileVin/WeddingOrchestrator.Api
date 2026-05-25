@@ -9,9 +9,10 @@ public class DocxService : IDocxService
 {
     private readonly string _storageRoot;
 
-    public DocxService(IWebHostEnvironment env)
+    public DocxService(IConfiguration config)
     {
-        _storageRoot = Path.Combine(env.ContentRootPath, "Storage", "Songs");
+        _storageRoot = config["SongStoragePath"]
+            ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "wedding-orchestrator", "songs");
     }
 
     public string CreateBlankDocx(string title, string directory)
@@ -95,6 +96,18 @@ public class DocxService : IDocxService
         if (!File.Exists(absolutePath))
             throw new FileNotFoundException("Song file not found.");
         return new FileStream(absolutePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+    }
+
+    public void OpenFileInWord(string relativePath)
+    {
+        var absolutePath = Path.Combine(_storageRoot, relativePath);
+        if (!File.Exists(absolutePath))
+            throw new FileNotFoundException("Song file not found.");
+        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+        {
+            FileName = absolutePath,
+            UseShellExecute = true
+        });
     }
 
     private static string Sanitize(string name) =>

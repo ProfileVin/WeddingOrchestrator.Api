@@ -21,6 +21,13 @@ public class WeddingsController : ControllerBase
     public async Task<IActionResult> GetAll() =>
         Ok(await _weddings.GetAllAsync());
 
+    [HttpGet("check-availability")]
+    public async Task<IActionResult> CheckAvailability(
+        [FromQuery] DateTime date,
+        [FromQuery] TimeOnly? startTime,
+        [FromQuery] TimeOnly? endTime) =>
+        Ok(await _weddings.CheckAvailabilityAsync(date, startTime, endTime));
+
     [HttpGet("{id:int}")]
     public async Task<IActionResult> GetById(int id) =>
         Ok(await _weddings.GetByIdAsync(id));

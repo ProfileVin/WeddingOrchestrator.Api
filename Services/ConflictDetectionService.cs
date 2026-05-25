@@ -63,7 +63,8 @@ public class ConflictDetectionService : IConflictDetectionService
                 {
                     PersonId = role.PersonId!.Value,
                     PersonName = role.Person?.FullName ?? string.Empty,
-                    RoleInThatWedding = RoleHelper.GetLabel(role.RoleType)
+                    RoleInThatWedding = RoleHelper.GetLabel(role.RoleType),
+                    SongsHeard = role.SongAssignments.Select(a => a.Song.Title).ToList()
                 });
             }
 

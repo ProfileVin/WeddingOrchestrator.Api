@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using WeddingOrchestrator.Api.Data;
 using WeddingOrchestrator.Api.DTOs.People;
+using WeddingOrchestrator.Api.Infrastructure;
 using WeddingOrchestrator.Api.Models;
 using WeddingOrchestrator.Api.Services.Interfaces;
 
@@ -15,10 +16,8 @@ public class PersonService : IPersonService
     public async Task<List<PersonDto>> GetAllAsync()
     {
         var people = await _db.People
-            .Include(p => p.Father).ThenInclude(f => f!.Father)
-            .Include(p => p.Father).ThenInclude(f => f!.Mother)
-            .Include(p => p.Mother).ThenInclude(m => m!.Father)
-            .Include(p => p.Mother).ThenInclude(m => m!.Mother)
+            .Include(p => p.Father)
+            .Include(p => p.Mother)
             .OrderBy(p => p.LastName).ThenBy(p => p.FirstName)
             .ToListAsync();
 
@@ -28,12 +27,8 @@ public class PersonService : IPersonService
     public async Task<List<PersonDto>> SearchAsync(string query)
     {
         var q = query.Trim().ToLower();
-        var people = await _db.People
-            .Include(p => p.Father).ThenInclude(f => f!.Father)
-            .Include(p => p.Father).ThenInclude(f => f!.Mother)
-            .Include(p => p.Mother).ThenInclude(m => m!.Father)
-            .Include(p => p.Mother).ThenInclude(m => m!.Mother)
-            .Where(p => (p.FirstName + " " + p.LastName).ToLower().Contains(q))
+        var people = await WithGrandparents()
+            .Where(p => p.FirstName.ToLower().Contains(q) || p.LastName.ToLower().Contains(q))
             .OrderBy(p => p.LastName).ThenBy(p => p.FirstName)
             .Take(20)
             .ToListAsync();
@@ -43,11 +38,7 @@ public class PersonService : IPersonService
 
     public async Task<PersonDto> GetByIdAsync(int id)
     {
-        var person = await _db.People
-            .Include(p => p.Father).ThenInclude(f => f!.Father)
-            .Include(p => p.Father).ThenInclude(f => f!.Mother)
-            .Include(p => p.Mother).ThenInclude(m => m!.Father)
-            .Include(p => p.Mother).ThenInclude(m => m!.Mother)
+        var person = await WithGrandparents()
             .FirstOrDefaultAsync(p => p.Id == id)
             ?? throw new KeyNotFoundException($"Person {id} not found.");
 
@@ -87,15 +78,23 @@ public class PersonService : IPersonService
         var person = await _db.People.FindAsync(id)
             ?? throw new KeyNotFoundException($"Person {id} not found.");
 
-        var isReferencedAsParent = await _db.People
-            .AnyAsync(p => p.FatherId == id || p.MotherId == id);
+        var isParent = await _db.People.AnyAsync(p => p.FatherId == id || p.MotherId == id);
+        if (isParent)
+            throw new DomainException("Cannot delete a person who is linked as a parent. Remove the parent link first.");
 
-        if (isReferencedAsParent)
-            throw new InvalidOperationException("Cannot delete a person who is linked as a parent. Remove the parent link first.");
+        var isInWedding = await _db.WeddingRoles.AnyAsync(r => r.PersonId == id);
+        if (isInWedding)
+            throw new DomainException("Cannot delete a person who is assigned to a wedding role.");
 
         _db.People.Remove(person);
         await _db.SaveChangesAsync();
     }
+
+    private IQueryable<Person> WithGrandparents() => _db.People
+        .Include(p => p.Father).ThenInclude(f => f!.Father)
+        .Include(p => p.Father).ThenInclude(f => f!.Mother)
+        .Include(p => p.Mother).ThenInclude(m => m!.Father)
+        .Include(p => p.Mother).ThenInclude(m => m!.Mother);
 
     private static PersonDto MapDto(Person p) => new()
     {

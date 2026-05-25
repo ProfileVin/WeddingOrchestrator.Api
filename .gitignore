@@ -5,3 +5,8 @@ obj/
 *.suo
 .DS_Store
 appsettings.Development.json
+
+# Ignore dotnet publish output
+**/bin/**/publish*/
+**/obj/**/publish*/
+**/publish*/
