@@ -35,6 +35,7 @@ public class AppDbContext : DbContext
             e.Property(p => p.FirstName).HasMaxLength(100).IsRequired();
             e.Property(p => p.LastName).HasMaxLength(100).IsRequired();
             e.Ignore(p => p.FullName);
+            e.HasIndex(p => new { p.FirstName, p.LastName }).IsUnique();
         });
 
         // ── SongCategory ───────────────────────────────────────────────────
@@ -60,7 +61,6 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<WeddingRole>(e =>
         {
             e.HasIndex(r => new { r.WeddingId, r.RoleType }).IsUnique();
-            e.Property(r => r.FreeTextName).HasMaxLength(200);
         });
 
         // ── WeddingRoleSongAssignment ──────────────────────────────────────

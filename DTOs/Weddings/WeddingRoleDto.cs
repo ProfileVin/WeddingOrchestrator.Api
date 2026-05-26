@@ -9,8 +9,7 @@ public class WeddingRoleDto
     public string RoleLabel { get; set; } = string.Empty;
     public int? PersonId { get; set; }
     public string? PersonName { get; set; }
-    public string? FreeTextName { get; set; }
-    public string DisplayName => PersonName ?? FreeTextName ?? string.Empty;
+    public string DisplayName => PersonName ?? string.Empty;
     public List<SongAssignmentDto> SongAssignments { get; set; } = new();
     public List<AvailableSongDto> AvailableSongs { get; set; } = new();
 }
@@ -29,6 +28,8 @@ public class AvailableSongDto
     public int SongId { get; set; }
     public string Title { get; set; } = string.Empty;
     public int CategoryId { get; set; }
+    public string CategoryName { get; set; } = string.Empty;
     public int AssignmentSlot { get; set; }
     public bool IsForbidden { get; set; }
+    public bool IsPrimaryCategory { get; set; }
 }

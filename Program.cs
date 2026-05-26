@@ -8,6 +8,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
@@ -16,6 +17,13 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("DevCors", policy =>
         policy.WithOrigins("http://localhost:5173", "http://localhost:5174")
+              .AllowAnyHeader()
+              .AllowAnyMethod());
+
+    // Electron loads the frontend from file:// so we allow any origin.
+    // Safe because the API only binds to localhost and is not reachable externally.
+    options.AddPolicy("ElectronCors", policy =>
+        policy.AllowAnyOrigin()
               .AllowAnyHeader()
               .AllowAnyMethod());
 });
@@ -38,8 +46,19 @@ using (var scope = app.Services.CreateScope())
 }
 
 app.UseMiddleware<GlobalExceptionMiddleware>();
-app.UseCors("DevCors");
+
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+    app.UseCors("DevCors");
+}
+else
+{
+    app.UseCors("ElectronCors");
+}
+
 app.UseAuthorization();
 app.MapControllers();
 
-app.Run();
+await app.RunAsync();

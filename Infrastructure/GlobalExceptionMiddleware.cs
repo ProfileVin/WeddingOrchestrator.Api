@@ -24,6 +24,10 @@ public class GlobalExceptionMiddleware
         {
             await WriteError(context, HttpStatusCode.NotFound, ex.Message);
         }
+        catch (DomainException ex)
+        {
+            await WriteError(context, HttpStatusCode.UnprocessableEntity, ex.Message);
+        }
         catch (InvalidOperationException ex)
         {
             await WriteError(context, HttpStatusCode.BadRequest, ex.Message);

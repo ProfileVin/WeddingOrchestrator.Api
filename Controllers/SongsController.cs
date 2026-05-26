@@ -21,9 +21,9 @@ public class SongsController : ControllerBase
         Ok(await _songs.GetByIdAsync(id));
 
     [HttpPost("upload")]
-    public async Task<IActionResult> Upload([FromForm] IFormFile file, [FromForm] int categoryId)
+    public async Task<IActionResult> Upload([FromForm] IFormFile file, [FromForm] int categoryId, [FromForm] string title)
     {
-        var dto = await _songs.UploadSongAsync(file, categoryId);
+        var dto = await _songs.UploadSongAsync(file, categoryId, title);
         return CreatedAtAction(nameof(GetById), new { id = dto.Id }, dto);
     }
 

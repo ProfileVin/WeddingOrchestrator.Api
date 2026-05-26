@@ -19,6 +19,7 @@ public class SharedPersonDto
     public int PersonId { get; set; }
     public string PersonName { get; set; } = string.Empty;
     public string RoleInThatWedding { get; set; } = string.Empty;
+    public List<string> SongsHeard { get; set; } = new();
 }
 
 public class ForbiddenCategoryDto

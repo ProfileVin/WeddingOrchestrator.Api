@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using WeddingOrchestrator.Api.Data;
 using WeddingOrchestrator.Api.DTOs.Songs;
+using WeddingOrchestrator.Api.Infrastructure;
 using WeddingOrchestrator.Api.Models;
 using WeddingOrchestrator.Api.Services.Interfaces;
 
@@ -12,11 +13,12 @@ public class SongService : ISongService
     private readonly IDocxService _docx;
     private readonly string _storageRoot;
 
-    public SongService(AppDbContext db, IDocxService docx, IWebHostEnvironment env)
+    public SongService(AppDbContext db, IDocxService docx, IConfiguration config)
     {
         _db = db;
         _docx = docx;
-        _storageRoot = Path.Combine(env.ContentRootPath, "Storage", "Songs");
+        _storageRoot = config["SongStoragePath"] ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "wedding-orchestrator", "songs");
+        Directory.CreateDirectory(_storageRoot);
     }
 
     public async Task<List<SongCategoryDto>> GetAllCategoriesWithSongsAsync()
@@ -67,16 +69,18 @@ public class SongService : ISongService
         return MapSongDto(song);
     }
 
-    public async Task<SongDto> UploadSongAsync(IFormFile file, int categoryId)
+    public async Task<SongDto> UploadSongAsync(IFormFile file, int categoryId, string title)
     {
+        ValidateDocxFile(file);
+
         var category = await _db.SongCategories.FindAsync(categoryId)
             ?? throw new KeyNotFoundException($"Category {categoryId} not found.");
 
         var dir = GetCategoryDir(category.Name);
         Directory.CreateDirectory(dir);
 
-        var title = Path.GetFileNameWithoutExtension(file.FileName);
-        var fileName = $"{Guid.NewGuid():N}_{SanitizeFileName(title)}.docx";
+        var sanitizedTitle = title.Trim();
+        var fileName = $"{Guid.NewGuid():N}_{SanitizeFileName(sanitizedTitle)}.docx";
         var absolutePath = Path.Combine(dir, fileName);
 
         await using (var fs = new FileStream(absolutePath, FileMode.Create))
@@ -85,7 +89,7 @@ public class SongService : ISongService
         var info = new FileInfo(absolutePath);
         var song = new Song
         {
-            Title = title,
+            Title = sanitizedTitle,
             SongCategoryId = categoryId,
             RelativeFilePath = Path.GetRelativePath(_storageRoot, absolutePath),
             FileSizeBytes = info.Length,
@@ -132,6 +136,7 @@ public class SongService : ISongService
             ?? throw new KeyNotFoundException($"Song {id} not found.");
 
         song.Title = dto.Title;
+        song.LastUpdatedUtc = DateTime.UtcNow;
 
         if (song.SongCategoryId != dto.CategoryId)
         {
@@ -153,12 +158,13 @@ public class SongService : ISongService
             ?? throw new KeyNotFoundException($"Song {id} not found.");
 
         var absolutePath = Path.Combine(_storageRoot, song.RelativeFilePath);
-        if (File.Exists(absolutePath))
-            File.Delete(absolutePath);
 
         _db.WeddingRoleSongAssignments.RemoveRange(song.Assignments);
         _db.Songs.Remove(song);
         await _db.SaveChangesAsync();
+
+        if (File.Exists(absolutePath))
+            File.Delete(absolutePath);
     }
 
     public async Task<(Stream stream, string fileName, string contentType)> DownloadSongAsync(int id)
@@ -174,6 +180,7 @@ public class SongService : ISongService
         return (stream, $"{song.Title}.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
     }
 
+    // Opens the file on the local machine. Only works when the API and the user share the same OS session (local desktop mode).
     public async Task OpenInWordAsync(int id)
     {
         var song = await _db.Songs.FindAsync(id)
@@ -192,13 +199,12 @@ public class SongService : ISongService
 
     public async Task<SongDto> ReplaceFileAsync(int id, IFormFile file)
     {
+        ValidateDocxFile(file);
+
         var song = await _db.Songs.Include(s => s.Category).FirstOrDefaultAsync(s => s.Id == id)
             ?? throw new KeyNotFoundException($"Song {id} not found.");
 
         var oldPath = Path.Combine(_storageRoot, song.RelativeFilePath);
-        if (File.Exists(oldPath))
-            File.Delete(oldPath);
-
         var dir = GetCategoryDir(song.Category.Name);
         Directory.CreateDirectory(dir);
         var fileName = $"{Guid.NewGuid():N}_{SanitizeFileName(song.Title)}.docx";
@@ -213,6 +219,10 @@ public class SongService : ISongService
         song.LastUpdatedUtc = info.LastWriteTimeUtc;
 
         await _db.SaveChangesAsync();
+
+        if (File.Exists(oldPath))
+            File.Delete(oldPath);
+
         return MapSongDto(song);
     }
 
@@ -232,6 +242,13 @@ public class SongService : ISongService
             song.LastUpdatedUtc = info.LastWriteTimeUtc;
         }
         await _db.SaveChangesAsync();
+    }
+
+    private static void ValidateDocxFile(IFormFile file)
+    {
+        var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
+        if (ext != ".docx")
+            throw new DomainException("Only .docx files are supported.");
     }
 
     private string GetCategoryDir(string categoryName) =>

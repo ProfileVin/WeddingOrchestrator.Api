@@ -1,7 +1,4 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using WeddingOrchestrator.Api.Data;
-using WeddingOrchestrator.Api.Infrastructure;
 using WeddingOrchestrator.Api.Models.Enums;
 using WeddingOrchestrator.Api.Services.Interfaces;
 
@@ -11,16 +8,14 @@ namespace WeddingOrchestrator.Api.Controllers;
 [Route("api/export")]
 public class ExportController : ControllerBase
 {
-    private readonly AppDbContext _db;
     private readonly IDocxService _docx;
     private readonly IExcelExportService _excel;
     private readonly IWeddingService _weddings;
     private readonly IConflictDetectionService _conflicts;
 
-    public ExportController(AppDbContext db, IDocxService docx, IExcelExportService excel,
+    public ExportController(IDocxService docx, IExcelExportService excel,
         IWeddingService weddings, IConflictDetectionService conflicts)
     {
-        _db = db;
         _docx = docx;
         _excel = excel;
         _weddings = weddings;
@@ -30,35 +25,29 @@ public class ExportController : ControllerBase
     [HttpGet("{weddingId:int}/individual/{roleType}")]
     public async Task<IActionResult> DownloadIndividual(int weddingId, RoleType roleType)
     {
-        var role = await _db.WeddingRoles
-            .Include(r => r.SongAssignments).ThenInclude(a => a.Song)
-            .FirstOrDefaultAsync(r => r.WeddingId == weddingId && r.RoleType == roleType);
+        var data = await _weddings.GetRoleSongExportDataAsync(weddingId, roleType);
+        if (data == null) return NotFound("Role not found or no song assigned.");
 
-        if (role == null) return NotFound("Role not found.");
-
-        var assignment = role.SongAssignments.FirstOrDefault(a => a.AssignmentSlot == 1);
-        if (assignment == null) return NotFound("No song assigned.");
-
-        var stream = _docx.GetSongStream(assignment.Song.RelativeFilePath);
-        var fileName = $"{RoleHelper.GetLabel(roleType)}_{assignment.Song.Title}.docx";
+        var (roleLabel, filePath, songTitle) = data.Value;
+        var stream = _docx.GetSongStream(filePath);
+        var fileName = $"{roleLabel}_{songTitle}.docx";
         return File(stream, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", fileName);
+    }
+
+    [HttpGet("{weddingId:int}/open/{roleType}")]
+    public async Task<IActionResult> OpenIndividualInWord(int weddingId, RoleType roleType)
+    {
+        var data = await _weddings.GetRoleSongExportDataAsync(weddingId, roleType);
+        if (data == null) return NotFound("Role not found or no song assigned.");
+
+        _docx.OpenFileInWord(data.Value.filePath);
+        return Ok();
     }
 
     [HttpGet("{weddingId:int}/combined")]
     public async Task<IActionResult> DownloadCombined(int weddingId)
     {
-        var wedding = await _db.Weddings
-            .Include(w => w.Roles).ThenInclude(r => r.SongAssignments).ThenInclude(a => a.Song)
-            .FirstOrDefaultAsync(w => w.Id == weddingId);
-
-        if (wedding == null) return NotFound();
-
-        var songs = wedding.Roles
-            .OrderBy(r => r.RoleType)
-            .SelectMany(r => r.SongAssignments.OrderBy(a => a.AssignmentSlot)
-                .Select(a => (RoleHelper.GetLabel(r.RoleType), a.Song.Title, a.Song.RelativeFilePath)))
-            .ToList();
-
+        var songs = await _weddings.GetCombinedExportDataAsync(weddingId);
         if (!songs.Any()) return BadRequest("No songs assigned.");
 
         var stream = _docx.GenerateCombinedDocx(weddingId, songs);
