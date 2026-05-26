@@ -12,14 +12,16 @@ public class ExportController : ControllerBase
     private readonly IExcelExportService _excel;
     private readonly IWeddingService _weddings;
     private readonly IConflictDetectionService _conflicts;
+    private readonly IWeddingFolderService _folder;
 
     public ExportController(IDocxService docx, IExcelExportService excel,
-        IWeddingService weddings, IConflictDetectionService conflicts)
+        IWeddingService weddings, IConflictDetectionService conflicts, IWeddingFolderService folder)
     {
         _docx = docx;
         _excel = excel;
         _weddings = weddings;
         _conflicts = conflicts;
+        _folder = folder;
     }
 
     [HttpGet("{weddingId:int}/individual/{roleType}")]
@@ -37,6 +39,18 @@ public class ExportController : ControllerBase
     [HttpGet("{weddingId:int}/open/{roleType}")]
     public async Task<IActionResult> OpenIndividualInWord(int weddingId, RoleType roleType)
     {
+        // Prefer the copy in the wedding output folder; fall back to the source song library.
+        var weddingFolderPath = await _folder.GetRoleSongPathAsync(weddingId, roleType);
+        if (weddingFolderPath != null)
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = weddingFolderPath,
+                UseShellExecute = true
+            });
+            return Ok();
+        }
+
         var data = await _weddings.GetRoleSongExportDataAsync(weddingId, roleType);
         if (data == null) return NotFound("Role not found or no song assigned.");
 

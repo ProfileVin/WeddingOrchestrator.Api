@@ -34,6 +34,7 @@ builder.Services.AddScoped<IWeddingService, WeddingService>();
 builder.Services.AddScoped<IConflictDetectionService, ConflictDetectionService>();
 builder.Services.AddScoped<IDocxService, DocxService>();
 builder.Services.AddScoped<IExcelExportService, ExcelExportService>();
+builder.Services.AddScoped<IWeddingFolderService, WeddingFolderService>();
 
 var app = builder.Build();
 

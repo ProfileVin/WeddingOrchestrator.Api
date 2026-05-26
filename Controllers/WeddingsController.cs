@@ -10,11 +10,13 @@ public class WeddingsController : ControllerBase
 {
     private readonly IWeddingService _weddings;
     private readonly IConflictDetectionService _conflicts;
+    private readonly IWeddingFolderService _folder;
 
-    public WeddingsController(IWeddingService weddings, IConflictDetectionService conflicts)
+    public WeddingsController(IWeddingService weddings, IConflictDetectionService conflicts, IWeddingFolderService folder)
     {
         _weddings = weddings;
         _conflicts = conflicts;
+        _folder = folder;
     }
 
     [HttpGet]
@@ -58,6 +60,13 @@ public class WeddingsController : ControllerBase
     [HttpPost("{id:int}/unfinalize")]
     public async Task<IActionResult> Unfinalize(int id) =>
         Ok(await _weddings.UnfinalizeAsync(id));
+
+    [HttpPost("{id:int}/sync-folder")]
+    public async Task<IActionResult> SyncFolder(int id)
+    {
+        await _folder.SyncFolderAsync(id);
+        return Ok();
+    }
 
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete(int id)
