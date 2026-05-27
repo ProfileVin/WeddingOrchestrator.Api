@@ -204,6 +204,7 @@ public class WeddingFolderService : IWeddingFolderService
     {
         var wedding = await _db.Weddings
             .Include(w => w.Roles).ThenInclude(r => r.Person)
+            .Include(w => w.Roles).ThenInclude(r => r.SongAssignments).ThenInclude(a => a.Song)
             .FirstOrDefaultAsync(w => w.Id == weddingId)
             ?? throw new KeyNotFoundException($"Wedding {weddingId} not found.");
 
@@ -249,68 +250,62 @@ public class WeddingFolderService : IWeddingFolderService
 
     private static string BuildHistoryText(Wedding wedding, List<WeddingRole> pastRoles)
     {
-        const int width = 52;
+        const int col1 = 16, col2 = 12, col3 = 32;
+        const int sepWidth = 70;
+        var sep = new string('=', sepWidth);
         var sb = new System.Text.StringBuilder();
 
-        sb.AppendLine("PAST SONG HISTORY");
-        sb.AppendLine(new string('=', width));
-        sb.AppendLine($"Wedding:   {WeddingTitleHelper.Compute(wedding)}");
-        sb.AppendLine($"Date:      {wedding.DateOfWedding:yyyy-MM-dd}");
-        sb.AppendLine($"Generated: {DateTime.Now:yyyy-MM-dd HH:mm}");
+        // ── Section 1: Current Wedding Song History ───────────────────────
+        sb.AppendLine("CURRENT WEDDING SONG HISTORY");
+        sb.AppendLine(sep);
         sb.AppendLine();
 
-        var grouped = pastRoles.GroupBy(r => r.PersonId!.Value).ToList();
+        sb.AppendLine($"{"Persons Name".PadRight(col1)}{"Role".PadRight(col2)}{"Wedding Name and Date".PadRight(col3)}Song Used");
 
-        if (grouped.Count == 0)
-            sb.AppendLine("No past song history found for the people in this wedding.");
-        else
-            foreach (var personGroup in grouped)
-                AppendPersonSection(sb, personGroup, wedding, width);
+        var currentNameAndDate = $"{WeddingTitleHelper.Compute(wedding)}, {wedding.DateOfWedding:yyyy-MM-dd}";
+        var rolesWithSongs = wedding.Roles
+            .Where(r => r.SongAssignments.Count > 0)
+            .OrderBy(r => r.RoleType);
 
-        sb.AppendLine(new string('=', width));
-        return sb.ToString();
-    }
-
-    private static void AppendPersonSection(
-        System.Text.StringBuilder sb,
-        IGrouping<int, WeddingRole> personGroup,
-        Wedding wedding,
-        int width)
-    {
-        var person = personGroup.First().Person!;
-        var currentRole = wedding.Roles.FirstOrDefault(r => r.PersonId == personGroup.Key);
-        var currentRoleLabel = currentRole != null ? RoleHelper.GetLabel(currentRole.RoleType) : "—";
-
-        sb.AppendLine(new string('-', width));
-        sb.AppendLine($"Person:              {person.FullName}");
-        sb.AppendLine($"Role (this wedding): {currentRoleLabel}");
-        sb.AppendLine();
-
-        foreach (var role in personGroup.OrderByDescending(r => r.Wedding.DateOfWedding))
-            AppendRoleEntry(sb, role);
-    }
-
-    private static void AppendRoleEntry(System.Text.StringBuilder sb, WeddingRole role)
-    {
-        var pastTitle = WeddingTitleHelper.Compute(role.Wedding);
-        sb.AppendLine($"  Past Wedding: {pastTitle} ({role.Wedding.DateOfWedding:yyyy-MM-dd})");
-        sb.AppendLine($"  Role:         {RoleHelper.GetLabel(role.RoleType)}");
-
-        var songs = role.SongAssignments.OrderBy(a => a.AssignmentSlot).ToList();
-        if (songs.Count > 0)
+        foreach (var role in rolesWithSongs)
         {
-            foreach (var sa in songs)
+            var name = role.Person?.FullName ?? string.Empty;
+            var label = RoleHelper.GetLabel(role.RoleType);
+            foreach (var sa in role.SongAssignments.OrderBy(a => a.AssignmentSlot))
+                sb.AppendLine($"{name.PadRight(col1)}{label.PadRight(col2)}{currentNameAndDate.PadRight(col3)}{sa.Song.Title}");
+        }
+
+        sb.AppendLine();
+        sb.AppendLine(sep);
+        sb.AppendLine();
+
+        // ── Section 2: Past Wedding Song History ──────────────────────────
+        sb.AppendLine("PAST WEDDING SONG HISTORY");
+        sb.AppendLine();
+
+        sb.AppendLine($"{"Persons Name".PadRight(col1)}{"Past Role".PadRight(col2)}{"Past Wedding Name and Date".PadRight(col3)}Song Used");
+
+        var grouped = pastRoles.GroupBy(r => r.PersonId!.Value);
+        foreach (var personGroup in grouped)
+        {
+            var person = personGroup.First().Person!;
+            foreach (var role in personGroup.OrderByDescending(r => r.Wedding.DateOfWedding))
             {
-                var slotLabel = sa.AssignmentSlot > 1 ? $" (Slot {sa.AssignmentSlot})" : "";
-                sb.AppendLine($"  Song{slotLabel}:         {sa.Song.Title}");
+                var pastNameAndDate = $"{WeddingTitleHelper.Compute(role.Wedding)}, {role.Wedding.DateOfWedding:yyyy-MM-dd}";
+                var pastRole = RoleHelper.GetLabel(role.RoleType);
+                if (role.SongAssignments.Count > 0)
+                {
+                    foreach (var sa in role.SongAssignments.OrderBy(a => a.AssignmentSlot))
+                        sb.AppendLine($"{person.FullName.PadRight(col1)}{pastRole.PadRight(col2)}{pastNameAndDate.PadRight(col3)}{sa.Song.Title}");
+                }
+                else
+                {
+                    sb.AppendLine($"{person.FullName.PadRight(col1)}{pastRole.PadRight(col2)}{pastNameAndDate.PadRight(col3)}(none assigned)");
+                }
             }
         }
-        else
-        {
-            sb.AppendLine("  Song:         (none assigned)");
-        }
 
-        sb.AppendLine();
+        return sb.ToString();
     }
 
     private static string SanitizeFolderSegment(string name)
