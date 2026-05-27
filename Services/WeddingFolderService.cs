@@ -30,15 +30,8 @@ public class WeddingFolderService : IWeddingFolderService
             .FirstOrDefaultAsync(w => w.Id == weddingId)
             ?? throw new KeyNotFoundException($"Wedding {weddingId} not found.");
 
-        var groomRole = wedding.Roles.FirstOrDefault(r => r.RoleType == RoleType.Groom);
-        var brideRole = wedding.Roles.FirstOrDefault(r => r.RoleType == RoleType.Bride);
-        var groomName = SanitizeFolderSegment(groomRole?.Person?.LastName ?? "Groom");
-        var brideName = SanitizeFolderSegment(brideRole?.Person?.LastName ?? "Bride");
-
-        var dateSegment = wedding.DateOfWedding.ToString("yyyy-MM-dd");
-        var coupleFolder = $"{groomName}-{brideName}";
-        var songsFolder = Path.Combine(_weddingOutputRoot, dateSegment, weddingId.ToString(), coupleFolder, "Songs");
-
+        var weddingDir  = ResolveWeddingDir(wedding, weddingId);
+        var songsFolder = Path.Combine(weddingDir, "Songs");
         Directory.CreateDirectory(songsFolder);
 
         var assignments = wedding.Roles
@@ -75,6 +68,103 @@ public class WeddingFolderService : IWeddingFolderService
             if (!expectedFileNames.Contains(Path.GetFileName(existing)))
                 File.Delete(existing);
         }
+
+        // Auto-generate the combined songs CSV
+        var personIds = wedding.Roles
+            .Where(r => r.PersonId.HasValue)
+            .Select(r => r.PersonId!.Value)
+            .Distinct()
+            .ToList();
+        var pastRoles = await QueryPastRolesAsync(personIds, weddingId);
+        await GenerateCombinedSongsCsvAsync(wedding, pastRoles, weddingDir);
+    }
+
+    public async Task OpenCombinedSongsTxtAsync(int weddingId)
+    {
+        var wedding = await _db.Weddings
+            .Include(w => w.Roles).ThenInclude(r => r.Person)
+            .Include(w => w.Roles).ThenInclude(r => r.SongAssignments).ThenInclude(a => a.Song)
+            .FirstOrDefaultAsync(w => w.Id == weddingId)
+            ?? throw new KeyNotFoundException($"Wedding {weddingId} not found.");
+
+        var weddingDir = ResolveWeddingDir(wedding, weddingId);
+        Directory.CreateDirectory(weddingDir);
+
+        var personIds = wedding.Roles
+            .Where(r => r.PersonId.HasValue)
+            .Select(r => r.PersonId!.Value)
+            .Distinct()
+            .ToList();
+        var pastRoles = await QueryPastRolesAsync(personIds, weddingId);
+
+        // Always regenerate so the file is never stale or missing
+        await GenerateCombinedSongsCsvAsync(wedding, pastRoles, weddingDir);
+
+        var filePath = Path.Combine(weddingDir, "CombinedSongs.csv");
+        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+        {
+            FileName = filePath,
+            UseShellExecute = true
+        });
+    }
+
+    private static async Task GenerateCombinedSongsCsvAsync(
+        Wedding wedding, List<WeddingRole> pastRoles, string weddingDir)
+    {
+        var sb = new System.Text.StringBuilder();
+        var weddingAndDate = $"{WeddingTitleHelper.Compute(wedding)}, {wedding.DateOfWedding:M/d/yyyy}";
+
+        // ── Section 1: Current Wedding Songs ──────────────────────────────
+        sb.AppendLine("CURRENT WEDDING SONGS");
+        sb.AppendLine("Person Name,Role,Wedding And Date,Song Used");
+
+        var rolesWithSongs = wedding.Roles
+            .Where(r => r.SongAssignments.Count > 0)
+            .OrderBy(r => r.RoleType);
+
+        foreach (var role in rolesWithSongs)
+        {
+            var personName = role.Person?.FullName ?? string.Empty;
+            foreach (var sa in role.SongAssignments.OrderBy(a => a.AssignmentSlot))
+                sb.AppendLine($"{Csv(personName)},{Csv(RoleHelper.GetLabel(role.RoleType))},{Csv(weddingAndDate)},{Csv(sa.Song.Title)}");
+        }
+
+        // ── Section 2: Past Songs History ─────────────────────────────────
+        sb.AppendLine();
+        sb.AppendLine("PAST SONGS HISTORY");
+        sb.AppendLine("Person Name,Past Role,Past Wedding And Date,Song Used");
+
+        var grouped = pastRoles.GroupBy(r => r.PersonId!.Value);
+        foreach (var personGroup in grouped)
+        {
+            var person = personGroup.First().Person!;
+
+            foreach (var role in personGroup.OrderByDescending(r => r.Wedding.DateOfWedding))
+            {
+                var pastWeddingAndDate = $"{WeddingTitleHelper.Compute(role.Wedding)}, {role.Wedding.DateOfWedding:M/d/yyyy}";
+                var pastRole = RoleHelper.GetLabel(role.RoleType);
+
+                if (role.SongAssignments.Count > 0)
+                {
+                    foreach (var sa in role.SongAssignments.OrderBy(a => a.AssignmentSlot))
+                        sb.AppendLine($"{Csv(person.FullName)},{Csv(pastRole)},{Csv(pastWeddingAndDate)},{Csv(sa.Song.Title)}");
+                }
+                else
+                {
+                    sb.AppendLine($"{Csv(person.FullName)},{Csv(pastRole)},{Csv(pastWeddingAndDate)},(none assigned)");
+                }
+            }
+        }
+
+        await File.WriteAllTextAsync(Path.Combine(weddingDir, "CombinedSongs.csv"), sb.ToString());
+    }
+
+    /// <summary>Wraps a value in quotes if it contains a comma, quote, or newline.</summary>
+    private static string Csv(string value)
+    {
+        if (value.Contains(',') || value.Contains('"') || value.Contains('\n'))
+            return $"\"{value.Replace("\"", "\"\"")}\"";
+        return value;
     }
 
     public async Task<string?> GetRoleSongPathAsync(int weddingId, RoleType roleType, int assignmentSlot = 1)
