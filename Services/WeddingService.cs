@@ -157,7 +157,46 @@ public class WeddingService : IWeddingService
         }
 
         await _db.SaveChangesAsync();
+        await SyncFamilyLinksAsync(id);
         return await GetByIdAsync(id);
+    }
+
+    private async Task SyncFamilyLinksAsync(int weddingId)
+    {
+        var roles = await _db.WeddingRoles
+            .Where(r => r.WeddingId == weddingId && r.PersonId.HasValue)
+            .ToDictionaryAsync(r => r.RoleType, r => r.PersonId!.Value);
+
+        var linkPairs = new[]
+        {
+            (Child: RoleType.Groom,         Father: RoleType.FatherOfGroom,               Mother: RoleType.MotherOfGroom),
+            (Child: RoleType.Bride,         Father: RoleType.FatherOfBride,               Mother: RoleType.MotherOfBride),
+            (Child: RoleType.FatherOfGroom, Father: RoleType.PaternalGrandfatherOfGroom,  Mother: RoleType.PaternalGrandmotherOfGroom),
+            (Child: RoleType.MotherOfGroom, Father: RoleType.MaternalGrandfatherOfGroom,  Mother: RoleType.MaternalGrandmotherOfGroom),
+            (Child: RoleType.FatherOfBride, Father: RoleType.PaternalGrandfatherOfBride,  Mother: RoleType.PaternalGrandmotherOfBride),
+            (Child: RoleType.MotherOfBride, Father: RoleType.MaternalGrandfatherOfBride,  Mother: RoleType.MaternalGrandmotherOfBride),
+        };
+
+        var changed = false;
+        foreach (var (childRole, fatherRole, motherRole) in linkPairs)
+        {
+            if (!roles.TryGetValue(childRole, out var childId)) continue;
+            var child = await _db.People.FindAsync(childId);
+            if (child == null) continue;
+
+            if (!child.FatherId.HasValue && roles.TryGetValue(fatherRole, out var fatherId))
+            {
+                child.FatherId = fatherId;
+                changed = true;
+            }
+            if (!child.MotherId.HasValue && roles.TryGetValue(motherRole, out var motherId))
+            {
+                child.MotherId = motherId;
+                changed = true;
+            }
+        }
+
+        if (changed) await _db.SaveChangesAsync();
     }
 
     public async Task<WeddingDto> AssignSongsAsync(int id, AssignSongsDto dto)

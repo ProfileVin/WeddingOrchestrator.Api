@@ -25,6 +25,10 @@ public class PeopleController : ControllerBase
     public async Task<IActionResult> GetById(int id) =>
         Ok(await _people.GetByIdAsync(id));
 
+    [HttpGet("{id:int}/profile")]
+    public async Task<IActionResult> GetProfile(int id) =>
+        Ok(await _people.GetProfileAsync(id));
+
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreatePersonDto dto)
     {

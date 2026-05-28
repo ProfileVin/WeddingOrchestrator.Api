@@ -94,6 +94,118 @@ public class PersonService : IPersonService
         return MapDto(person);
     }
 
+    public async Task<PersonProfileDto> GetProfileAsync(int id)
+    {
+        var person = await _db.People
+            .Include(p => p.Father).ThenInclude(f => f!.Father)
+            .Include(p => p.Father).ThenInclude(f => f!.Mother)
+            .Include(p => p.Mother).ThenInclude(m => m!.Father)
+            .Include(p => p.Mother).ThenInclude(m => m!.Mother)
+            .Include(p => p.WeddingRoles).ThenInclude(wr => wr.Wedding).ThenInclude(w => w.Roles).ThenInclude(r => r.Person)
+            .FirstOrDefaultAsync(p => p.Id == id)
+            ?? throw new KeyNotFoundException($"Person {id} not found.");
+
+        var siblings = (person.FatherId.HasValue || person.MotherId.HasValue)
+            ? await _db.People
+                .Where(p => p.Id != id &&
+                            ((person.FatherId.HasValue && p.FatherId == person.FatherId) ||
+                             (person.MotherId.HasValue && p.MotherId == person.MotherId)))
+                .OrderBy(p => p.LastName).ThenBy(p => p.FirstName)
+                .ToListAsync()
+            : new List<Person>();
+
+        var weddings = person.WeddingRoles
+            .Where(wr => wr.RoleType != RoleType.WeddingItself)
+            .OrderByDescending(wr => wr.Wedding.DateOfWedding)
+            .Select(wr => new PersonWeddingDto
+            {
+                WeddingId = wr.WeddingId,
+                Title = WeddingTitleHelper.Compute(wr.Wedding),
+                Date = wr.Wedding.DateOfWedding.ToString("MMM d, yyyy"),
+                Role = RoleHelper.GetLabel(wr.RoleType),
+                IsFinalized = wr.Wedding.IsFinalized
+            })
+            .ToList();
+
+        var profile = new PersonProfileDto
+        {
+            Id = person.Id,
+            FirstName = person.FirstName,
+            LastName = person.LastName,
+            FullName = person.FullName,
+            Gender = person.Gender.ToString().ToLower(),
+            Father = person.Father != null ? ToSummary(person.Father) : null,
+            Mother = person.Mother != null ? ToSummary(person.Mother) : null,
+            Siblings = siblings.Select(ToSummary).ToList(),
+            PaternalGrandfather = person.Father?.Father != null ? ToSummary(person.Father.Father) : null,
+            PaternalGrandmother = person.Father?.Mother != null ? ToSummary(person.Father.Mother) : null,
+            MaternalGrandfather = person.Mother?.Father != null ? ToSummary(person.Mother.Father) : null,
+            MaternalGrandmother = person.Mother?.Mother != null ? ToSummary(person.Mother.Mother) : null,
+            Weddings = weddings
+        };
+
+        AugmentProfileFromWeddingRoles(person, profile);
+
+        return profile;
+    }
+
+    private static void AugmentProfileFromWeddingRoles(Person person, PersonProfileDto profile)
+    {
+        foreach (var wr in person.WeddingRoles)
+        {
+            var wRoles = wr.Wedding.Roles;
+
+            PersonSummaryDto? Derive(RoleType rt)
+            {
+                var p = wRoles.FirstOrDefault(r => r.RoleType == rt && r.Person != null)?.Person;
+                return p != null ? ToSummary(p) : null;
+            }
+
+            switch (wr.RoleType)
+            {
+                case RoleType.Groom:
+                    profile.Father              ??= Derive(RoleType.FatherOfGroom);
+                    profile.Mother              ??= Derive(RoleType.MotherOfGroom);
+                    profile.PaternalGrandfather ??= Derive(RoleType.PaternalGrandfatherOfGroom);
+                    profile.PaternalGrandmother ??= Derive(RoleType.PaternalGrandmotherOfGroom);
+                    profile.MaternalGrandfather ??= Derive(RoleType.MaternalGrandfatherOfGroom);
+                    profile.MaternalGrandmother ??= Derive(RoleType.MaternalGrandmotherOfGroom);
+                    break;
+                case RoleType.Bride:
+                    profile.Father              ??= Derive(RoleType.FatherOfBride);
+                    profile.Mother              ??= Derive(RoleType.MotherOfBride);
+                    profile.PaternalGrandfather ??= Derive(RoleType.PaternalGrandfatherOfBride);
+                    profile.PaternalGrandmother ??= Derive(RoleType.PaternalGrandmotherOfBride);
+                    profile.MaternalGrandfather ??= Derive(RoleType.MaternalGrandfatherOfBride);
+                    profile.MaternalGrandmother ??= Derive(RoleType.MaternalGrandmotherOfBride);
+                    break;
+                case RoleType.FatherOfGroom:
+                    profile.Father ??= Derive(RoleType.PaternalGrandfatherOfGroom);
+                    profile.Mother ??= Derive(RoleType.PaternalGrandmotherOfGroom);
+                    break;
+                case RoleType.MotherOfGroom:
+                    profile.Father ??= Derive(RoleType.MaternalGrandfatherOfGroom);
+                    profile.Mother ??= Derive(RoleType.MaternalGrandmotherOfGroom);
+                    break;
+                case RoleType.FatherOfBride:
+                    profile.Father ??= Derive(RoleType.PaternalGrandfatherOfBride);
+                    profile.Mother ??= Derive(RoleType.PaternalGrandmotherOfBride);
+                    break;
+                case RoleType.MotherOfBride:
+                    profile.Father ??= Derive(RoleType.MaternalGrandfatherOfBride);
+                    profile.Mother ??= Derive(RoleType.MaternalGrandmotherOfBride);
+                    break;
+            }
+        }
+    }
+
+    private static PersonSummaryDto ToSummary(Person p) => new()
+    {
+        Id = p.Id,
+        FullName = p.FullName,
+        Gender = p.Gender.ToString().ToLower()
+    };
+
     public async Task<PersonDto> CreateAsync(CreatePersonDto dto)
     {
         var person = new Person
