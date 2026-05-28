@@ -3,6 +3,7 @@ using WeddingOrchestrator.Api.Data;
 using WeddingOrchestrator.Api.DTOs.People;
 using WeddingOrchestrator.Api.Infrastructure;
 using WeddingOrchestrator.Api.Models;
+using WeddingOrchestrator.Api.Models.Enums;
 using WeddingOrchestrator.Api.Services.Interfaces;
 
 namespace WeddingOrchestrator.Api.Services;
@@ -24,11 +25,59 @@ public class PersonService : IPersonService
         return people.Select(MapDto).ToList();
     }
 
-    public async Task<List<PersonDto>> SearchAsync(string query)
+    public async Task<List<PersonDto>> SearchAsync(string query, RoleType? roleType = null)
     {
         var q = query.Trim().ToLower();
-        var people = await WithGrandparents()
-            .Where(p => p.FirstName.ToLower().Contains(q) || p.LastName.ToLower().Contains(q))
+
+        var maleRoles = new HashSet<RoleType> {
+            RoleType.Groom, RoleType.FatherOfGroom, RoleType.FatherOfBride,
+            RoleType.PaternalGrandfatherOfGroom, RoleType.PaternalGrandfatherOfBride,
+            RoleType.MaternalGrandfatherOfGroom, RoleType.MaternalGrandfatherOfBride,
+        };
+        var femaleRoles = new HashSet<RoleType> {
+            RoleType.Bride, RoleType.MotherOfGroom, RoleType.MotherOfBride,
+            RoleType.PaternalGrandmotherOfGroom, RoleType.PaternalGrandmotherOfBride,
+            RoleType.MaternalGrandmotherOfGroom, RoleType.MaternalGrandmotherOfBride,
+        };
+        var fatherGrandfatherRoles = new HashSet<RoleType> {
+            RoleType.FatherOfGroom, RoleType.FatherOfBride,
+            RoleType.PaternalGrandfatherOfGroom, RoleType.PaternalGrandfatherOfBride,
+            RoleType.MaternalGrandfatherOfGroom, RoleType.MaternalGrandfatherOfBride,
+        };
+        var motherGrandmotherRoles = new HashSet<RoleType> {
+            RoleType.MotherOfGroom, RoleType.MotherOfBride,
+            RoleType.PaternalGrandmotherOfGroom, RoleType.PaternalGrandmotherOfBride,
+            RoleType.MaternalGrandmotherOfGroom, RoleType.MaternalGrandmotherOfBride,
+        };
+
+        var baseQuery = WithGrandparents()
+            .Where(p => p.FirstName.ToLower().Contains(q) || p.LastName.ToLower().Contains(q));
+
+        if (roleType.HasValue)
+        {
+            if (maleRoles.Contains(roleType.Value))
+                baseQuery = baseQuery.Where(p => p.Gender == Gender.Male || p.Gender == Gender.Unknown);
+            else if (femaleRoles.Contains(roleType.Value))
+                baseQuery = baseQuery.Where(p => p.Gender == Gender.Female || p.Gender == Gender.Unknown);
+
+            if (fatherGrandfatherRoles.Contains(roleType.Value))
+            {
+                var pastGroomIds = _db.WeddingRoles
+                    .Where(r => r.RoleType == RoleType.Groom && r.PersonId.HasValue)
+                    .Select(r => r.PersonId!.Value);
+                baseQuery = baseQuery.Where(p => !pastGroomIds.Contains(p.Id));
+            }
+
+            if (motherGrandmotherRoles.Contains(roleType.Value))
+            {
+                var pastBrideIds = _db.WeddingRoles
+                    .Where(r => r.RoleType == RoleType.Bride && r.PersonId.HasValue)
+                    .Select(r => r.PersonId!.Value);
+                baseQuery = baseQuery.Where(p => !pastBrideIds.Contains(p.Id));
+            }
+        }
+
+        var people = await baseQuery
             .OrderBy(p => p.LastName).ThenBy(p => p.FirstName)
             .Take(20)
             .ToListAsync();
@@ -51,6 +100,7 @@ public class PersonService : IPersonService
         {
             FirstName = dto.FirstName.Trim(),
             LastName = dto.LastName.Trim(),
+            Gender = dto.Gender,
             FatherId = dto.FatherId,
             MotherId = dto.MotherId
         };
@@ -66,6 +116,7 @@ public class PersonService : IPersonService
 
         person.FirstName = dto.FirstName.Trim();
         person.LastName = dto.LastName.Trim();
+        person.Gender = dto.Gender;
         person.FatherId = dto.FatherId;
         person.MotherId = dto.MotherId;
 
@@ -102,6 +153,7 @@ public class PersonService : IPersonService
         FirstName = p.FirstName,
         LastName = p.LastName,
         FullName = p.FullName,
+        Gender = p.Gender.ToString().ToLower(),
         FatherId = p.FatherId,
         FatherName = p.Father?.FullName,
         MotherId = p.MotherId,

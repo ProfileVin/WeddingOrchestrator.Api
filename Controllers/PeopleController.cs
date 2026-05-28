@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using WeddingOrchestrator.Api.DTOs.People;
+using WeddingOrchestrator.Api.Models.Enums;
 using WeddingOrchestrator.Api.Services.Interfaces;
 
 namespace WeddingOrchestrator.Api.Controllers;
@@ -17,8 +18,8 @@ public class PeopleController : ControllerBase
         Ok(await _people.GetAllAsync());
 
     [HttpGet("search")]
-    public async Task<IActionResult> Search([FromQuery] string q = "") =>
-        Ok(await _people.SearchAsync(q));
+    public async Task<IActionResult> Search([FromQuery] string q = "", [FromQuery] RoleType? roleType = null) =>
+        Ok(await _people.SearchAsync(q, roleType));
 
     [HttpGet("{id:int}")]
     public async Task<IActionResult> GetById(int id) =>

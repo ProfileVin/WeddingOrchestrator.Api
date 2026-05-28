@@ -93,10 +93,10 @@ public class WeddingService : IWeddingService
         int? bridePersonId = null;
 
         if (!string.IsNullOrWhiteSpace(dto.GroomName))
-            groomPersonId = await FindOrCreatePersonByNameAsync(dto.GroomName);
+            groomPersonId = await FindOrCreatePersonByNameAsync(dto.GroomName, Gender.Male);
 
         if (!string.IsNullOrWhiteSpace(dto.BrideName))
-            bridePersonId = await FindOrCreatePersonByNameAsync(dto.BrideName);
+            bridePersonId = await FindOrCreatePersonByNameAsync(dto.BrideName, Gender.Female);
 
         var roles = RoleHelper.AllRoles.Select(roleType => new WeddingRole
         {
@@ -134,13 +134,22 @@ public class WeddingService : IWeddingService
             if (role == null) continue;
 
             var oldPersonId = role.PersonId;
+            var roleGender = GenderForRole(slotInput.RoleType);
 
             if (slotInput.PersonId.HasValue)
                 role.PersonId = slotInput.PersonId;
             else if (!string.IsNullOrWhiteSpace(slotInput.FreeTextName))
-                role.PersonId = await FindOrCreatePersonByNameAsync(slotInput.FreeTextName);
+                role.PersonId = await FindOrCreatePersonByNameAsync(slotInput.FreeTextName, roleGender);
             else
                 role.PersonId = null;
+
+            // Auto-set gender on the assigned person if it is still Unknown
+            if (role.PersonId.HasValue && roleGender != Gender.Unknown)
+            {
+                var person = await _db.People.FindAsync(role.PersonId.Value);
+                if (person != null && person.Gender == Gender.Unknown)
+                    person.Gender = roleGender;
+            }
 
             // SongAssignments are already loaded by LoadFullWedding
             if (role.PersonId != oldPersonId)
@@ -246,7 +255,7 @@ public class WeddingService : IWeddingService
         return MapWeddingDto(wedding, conflictReport, songsByCategory);
     }
 
-    private async Task<int> FindOrCreatePersonByNameAsync(string name)
+    private async Task<int> FindOrCreatePersonByNameAsync(string name, Gender gender = Gender.Unknown)
     {
         var trimmed = name.Trim();
         var parts = trimmed.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
@@ -255,11 +264,16 @@ public class WeddingService : IWeddingService
 
         var existing = await _db.People
             .FirstOrDefaultAsync(p => p.FirstName == firstName && p.LastName == lastName);
-        if (existing != null) return existing.Id;
+        if (existing != null)
+        {
+            if (gender != Gender.Unknown && existing.Gender == Gender.Unknown)
+                existing.Gender = gender;
+            return existing.Id;
+        }
 
         try
         {
-            var person = new Person { FirstName = firstName, LastName = lastName };
+            var person = new Person { FirstName = firstName, LastName = lastName, Gender = gender };
             _db.People.Add(person);
             await _db.SaveChangesAsync();
             return person.Id;
@@ -274,6 +288,25 @@ public class WeddingService : IWeddingService
                 .FirstAsync();
         }
     }
+
+    private static Gender GenderForRole(RoleType roleType) => roleType switch
+    {
+        RoleType.Groom                       => Gender.Male,
+        RoleType.FatherOfGroom               => Gender.Male,
+        RoleType.PaternalGrandfatherOfGroom  => Gender.Male,
+        RoleType.MaternalGrandfatherOfGroom  => Gender.Male,
+        RoleType.FatherOfBride               => Gender.Male,
+        RoleType.PaternalGrandfatherOfBride  => Gender.Male,
+        RoleType.MaternalGrandfatherOfBride  => Gender.Male,
+        RoleType.Bride                       => Gender.Female,
+        RoleType.MotherOfGroom               => Gender.Female,
+        RoleType.PaternalGrandmotherOfGroom  => Gender.Female,
+        RoleType.MaternalGrandmotherOfGroom  => Gender.Female,
+        RoleType.MotherOfBride               => Gender.Female,
+        RoleType.PaternalGrandmotherOfBride  => Gender.Female,
+        RoleType.MaternalGrandmotherOfBride  => Gender.Female,
+        _                                    => Gender.Unknown,
+    };
 
     private async Task<(Wedding, Dictionary<int, List<Song>>)> LoadFullWedding(int id)
     {

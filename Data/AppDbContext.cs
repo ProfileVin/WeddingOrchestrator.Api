@@ -34,6 +34,7 @@ public class AppDbContext : DbContext
 
             e.Property(p => p.FirstName).HasMaxLength(100).IsRequired();
             e.Property(p => p.LastName).HasMaxLength(100).IsRequired();
+            e.Property(p => p.Gender).HasConversion<int>();
             e.Ignore(p => p.FullName);
             e.HasIndex(p => new { p.FirstName, p.LastName }).IsUnique();
         });
