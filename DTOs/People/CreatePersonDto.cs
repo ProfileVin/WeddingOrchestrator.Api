@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using WeddingOrchestrator.Api.Models.Enums;
 
 namespace WeddingOrchestrator.Api.DTOs.People;
 
@@ -10,6 +11,7 @@ public class CreatePersonDto
     [Required, MaxLength(100)]
     public string LastName { get; set; } = string.Empty;
 
+    public Gender Gender { get; set; }
     public int? FatherId { get; set; }
     public int? MotherId { get; set; }
 }
