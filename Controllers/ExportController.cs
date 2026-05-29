@@ -69,6 +69,13 @@ public class ExportController : ControllerBase
         return File(stream, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", fileName);
     }
 
+    [HttpPost("{weddingId:int}/open-combined-txt")]
+    public async Task<IActionResult> OpenCombinedTxt(int weddingId)
+    {
+        await _folder.OpenCombinedSongsTxtAsync(weddingId);
+        return Ok();
+    }
+
     [HttpPost("{weddingId:int}/song-history")]
     public async Task<IActionResult> OpenSongHistory(int weddingId)
     {
