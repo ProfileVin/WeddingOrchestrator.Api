@@ -23,17 +23,11 @@ public class DocxService : IDocxService
 
         using var doc = WordprocessingDocument.Create(path, WordprocessingDocumentType.Document);
         var mainPart = doc.AddMainDocumentPart();
-        mainPart.Document = new Document(
-            new Body(
-                new Paragraph(
-                    new Run(
-                        new RunProperties(new Bold()),
-                        new Text(title)
-                    )
-                ),
-                new Paragraph(new Run(new Text(string.Empty)))
-            )
-        );
+        var body = new Body();
+        body.AppendChild(new Paragraph());
+        var document = new Document();
+        document.AppendChild(body);
+        mainPart.Document = document;
         mainPart.Document.Save();
         return path;
     }
