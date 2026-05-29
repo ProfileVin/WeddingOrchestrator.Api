@@ -69,6 +69,18 @@ public class ExportController : ControllerBase
         return File(stream, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", fileName);
     }
 
+    [HttpPost("{weddingId:int}/song-history")]
+    public async Task<IActionResult> OpenSongHistory(int weddingId)
+    {
+        var filePath = await _folder.GenerateSongHistoryFileAsync(weddingId);
+        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+        {
+            FileName = filePath,
+            UseShellExecute = true
+        });
+        return Ok(new { path = filePath });
+    }
+
     [HttpGet("{weddingId:int}/excel")]
     public async Task<IActionResult> DownloadExcel(int weddingId)
     {
