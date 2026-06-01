@@ -270,13 +270,14 @@ public class WeddingService : IWeddingService
         return (RoleHelper.GetLabel(roleType), assignment.Song.RelativeFilePath, assignment.Song.Title);
     }
 
-    public async Task<List<(string roleLabel, string songTitle, string filePath)>> GetCombinedExportDataAsync(int weddingId)
+    public async Task<List<(string roleLabel, string personName, string songTitle, string filePath)>> GetCombinedExportDataAsync(int weddingId)
     {
         var exists = await _db.Weddings.AnyAsync(w => w.Id == weddingId);
         if (!exists) throw new KeyNotFoundException($"Wedding {weddingId} not found.");
 
         var roles = await _db.WeddingRoles
             .Where(r => r.WeddingId == weddingId)
+            .Include(r => r.Person)
             .Include(r => r.SongAssignments).ThenInclude(a => a.Song)
             .OrderBy(r => r.RoleType)
             .ToListAsync();
@@ -284,7 +285,7 @@ public class WeddingService : IWeddingService
         return roles
             .SelectMany(r => r.SongAssignments
                 .OrderBy(a => a.AssignmentSlot)
-                .Select(a => (RoleHelper.GetLabel(r.RoleType), a.Song.Title, a.Song.RelativeFilePath)))
+                .Select(a => (RoleHelper.GetLabel(r.RoleType), r.Person?.FullName ?? string.Empty, a.Song.Title, a.Song.RelativeFilePath)))
             .ToList();
     }
 

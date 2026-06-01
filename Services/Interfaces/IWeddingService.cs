@@ -15,5 +15,5 @@ public interface IWeddingService
     Task<WeddingDto> UnfinalizeAsync(int id);
     Task DeleteAsync(int id);
     Task<(string roleLabel, string filePath, string songTitle)?> GetRoleSongExportDataAsync(int weddingId, RoleType roleType);
-    Task<List<(string roleLabel, string songTitle, string filePath)>> GetCombinedExportDataAsync(int weddingId);
+    Task<List<(string roleLabel, string personName, string songTitle, string filePath)>> GetCombinedExportDataAsync(int weddingId);
 }

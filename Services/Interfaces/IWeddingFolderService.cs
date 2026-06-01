@@ -8,4 +8,5 @@ public interface IWeddingFolderService
     Task<string?> GetRoleSongPathAsync(int weddingId, RoleType roleType, int assignmentSlot = 1);
     Task<string> GenerateSongHistoryFileAsync(int weddingId);
     Task OpenCombinedSongsTxtAsync(int weddingId);
+    Task<string> GetMasterPerformancePathAsync(int weddingId);
 }
