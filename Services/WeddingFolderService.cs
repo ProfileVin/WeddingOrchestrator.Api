@@ -167,6 +167,17 @@ public class WeddingFolderService : IWeddingFolderService
         return value;
     }
 
+    public async Task<string> GetMasterPerformancePathAsync(int weddingId)
+    {
+        var wedding = await _db.Weddings
+            .Include(w => w.Roles).ThenInclude(r => r.Person)
+            .FirstOrDefaultAsync(w => w.Id == weddingId)
+            ?? throw new KeyNotFoundException($"Wedding {weddingId} not found.");
+
+        var weddingDir = ResolveWeddingDir(wedding, weddingId);
+        return Path.Combine(weddingDir, "Master_Performance.docx");
+    }
+
     public async Task<string?> GetRoleSongPathAsync(int weddingId, RoleType roleType, int assignmentSlot = 1)
     {
         var wedding = await _db.Weddings

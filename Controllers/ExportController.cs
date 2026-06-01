@@ -72,7 +72,24 @@ public class ExportController : ControllerBase
     [HttpPost("{weddingId:int}/open-combined-txt")]
     public async Task<IActionResult> OpenCombinedTxt(int weddingId)
     {
-        await _folder.OpenCombinedSongsTxtAsync(weddingId);
+        var songs = await _weddings.GetCombinedExportDataAsync(weddingId);
+        if (!songs.Any()) return BadRequest("No songs assigned.");
+
+        var savePath = await _folder.GetMasterPerformancePathAsync(weddingId);
+        Directory.CreateDirectory(Path.GetDirectoryName(savePath)!);
+
+        using (var docxStream = _docx.GenerateCombinedDocx(weddingId, songs))
+        using (var fileStream = new FileStream(savePath, FileMode.Create, FileAccess.Write))
+        {
+            await docxStream.CopyToAsync(fileStream);
+        }
+
+        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+        {
+            FileName = savePath,
+            UseShellExecute = true
+        });
+
         return Ok();
     }
 

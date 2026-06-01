@@ -32,7 +32,7 @@ public class DocxService : IDocxService
         return path;
     }
 
-    public Stream GenerateCombinedDocx(int weddingId, List<(string roleLabel, string songTitle, string filePath)> songs)
+    public Stream GenerateCombinedDocx(int weddingId, List<(string roleLabel, string personName, string songTitle, string filePath)> songs)
     {
         var memStream = new MemoryStream();
 
@@ -43,26 +43,28 @@ public class DocxService : IDocxService
             mainPart.Document = new Document(body);
 
             bool first = true;
-            foreach (var (roleLabel, songTitle, filePath) in songs)
+            foreach (var (roleLabel, personName, songTitle, filePath) in songs)
             {
                 var absolutePath = Path.Combine(_storageRoot, filePath);
                 if (!File.Exists(absolutePath)) continue;
 
                 if (!first)
                 {
-                    // Page break before each new song
                     body.AppendChild(new Paragraph(
                         new Run(new Break { Type = BreakValues.Page })
                     ));
                 }
                 first = false;
 
-                // Section header: "Role — Song Title"
+                var headerText = string.IsNullOrWhiteSpace(personName)
+                    ? roleLabel
+                    : $"{roleLabel} - {personName}";
+
                 body.AppendChild(new Paragraph(
                     new ParagraphProperties(
                         new ParagraphStyleId { Val = "Heading1" }
                     ),
-                    new Run(new Text($"{roleLabel} — {songTitle}"))
+                    new Run(new Text(headerText))
                 ));
 
                 // Copy paragraphs from source document
