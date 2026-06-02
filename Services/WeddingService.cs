@@ -93,10 +93,14 @@ public class WeddingService : IWeddingService
         int? groomPersonId = null;
         int? bridePersonId = null;
 
-        if (!string.IsNullOrWhiteSpace(dto.GroomName))
+        if (!string.IsNullOrWhiteSpace(dto.GroomFirstName) || !string.IsNullOrWhiteSpace(dto.GroomLastName))
+            groomPersonId = await FindOrCreatePersonByFirstLastAsync(dto.GroomFirstName?.Trim() ?? string.Empty, dto.GroomLastName?.Trim() ?? string.Empty, Gender.Male);
+        else if (!string.IsNullOrWhiteSpace(dto.GroomName))
             groomPersonId = await FindOrCreatePersonByNameAsync(dto.GroomName, Gender.Male);
 
-        if (!string.IsNullOrWhiteSpace(dto.BrideName))
+        if (!string.IsNullOrWhiteSpace(dto.BrideFirstName) || !string.IsNullOrWhiteSpace(dto.BrideLastName))
+            bridePersonId = await FindOrCreatePersonByFirstLastAsync(dto.BrideFirstName?.Trim() ?? string.Empty, dto.BrideLastName?.Trim() ?? string.Empty, Gender.Female);
+        else if (!string.IsNullOrWhiteSpace(dto.BrideName))
             bridePersonId = await FindOrCreatePersonByNameAsync(dto.BrideName, Gender.Female);
 
         var roles = RoleHelper.AllRoles.Select(roleType => new WeddingRole
@@ -299,6 +303,23 @@ public class WeddingService : IWeddingService
     {
         var (wedding, songsByCategory) = await LoadFullWedding(id);
         return MapWeddingDto(wedding, conflictReport, songsByCategory);
+    }
+
+    private async Task<int> FindOrCreatePersonByFirstLastAsync(string firstName, string lastName, Gender gender = Gender.Unknown)
+    {
+        var existing = await _db.People
+            .FirstOrDefaultAsync(p => p.FirstName == firstName && p.LastName == lastName);
+        if (existing != null)
+        {
+            if (gender != Gender.Unknown && existing.Gender == Gender.Unknown)
+                existing.Gender = gender;
+            return existing.Id;
+        }
+
+        var person = new Person { FirstName = firstName, LastName = lastName, Gender = gender };
+        _db.People.Add(person);
+        await _db.SaveChangesAsync();
+        return person.Id;
     }
 
     private async Task<int> FindOrCreatePersonByNameAsync(string name, Gender gender = Gender.Unknown)
