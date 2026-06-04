@@ -84,7 +84,8 @@ public class WeddingService : IWeddingService
             EndTime = dto.EndTime,
             Location = dto.Location,
             IsFinalized = false,
-            CreatedUtc = DateTime.UtcNow
+            CreatedUtc = DateTime.Now,
+            UpdatedDate = DateTime.Now
         };
         _db.Weddings.Add(wedding);
         await _db.SaveChangesAsync();
@@ -156,6 +157,7 @@ public class WeddingService : IWeddingService
                 _db.WeddingRoleSongAssignments.RemoveRange(role.SongAssignments);
         }
 
+        wedding.UpdatedDate = DateTime.Now;
         await _db.SaveChangesAsync();
         await SyncFamilyLinksAsync(id);
         return await GetByIdAsync(id);
@@ -226,6 +228,7 @@ public class WeddingService : IWeddingService
                 });
         }
 
+        wedding.UpdatedDate = DateTime.Now;
         await _db.SaveChangesAsync();
         return await BuildWeddingDtoAsync(id, conflictReport);
     }
@@ -235,6 +238,7 @@ public class WeddingService : IWeddingService
         var wedding = await _db.Weddings.FindAsync(id)
             ?? throw new KeyNotFoundException($"Wedding {id} not found.");
         wedding.IsFinalized = true;
+        wedding.UpdatedDate = DateTime.Now;
         await _db.SaveChangesAsync();
         return await GetByIdAsync(id);
     }
@@ -244,6 +248,7 @@ public class WeddingService : IWeddingService
         var wedding = await _db.Weddings.FindAsync(id)
             ?? throw new KeyNotFoundException($"Wedding {id} not found.");
         wedding.IsFinalized = false;
+        wedding.UpdatedDate = DateTime.Now;
         await _db.SaveChangesAsync();
         return await GetByIdAsync(id);
     }
@@ -279,6 +284,7 @@ public class WeddingService : IWeddingService
             .Where(r => r.WeddingId == weddingId)
             .Include(r => r.Person)
             .Include(r => r.SongAssignments).ThenInclude(a => a.Song)
+            .AsSplitQuery()
             .OrderBy(r => r.RoleType)
             .ToListAsync();
 
@@ -353,6 +359,7 @@ public class WeddingService : IWeddingService
         var wedding = await _db.Weddings
             .Include(w => w.Roles).ThenInclude(r => r.Person)
             .Include(w => w.Roles).ThenInclude(r => r.SongAssignments).ThenInclude(a => a.Song).ThenInclude(s => s.Category)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(w => w.Id == id)
             ?? throw new KeyNotFoundException($"Wedding {id} not found.");
 
@@ -380,6 +387,8 @@ public class WeddingService : IWeddingService
             EndTime = w.EndTime,
             Location = w.Location,
             IsFinalized = w.IsFinalized,
+            CreatedUtc = w.CreatedUtc,
+            UpdatedDate = w.UpdatedDate,
             Roles = w.Roles.OrderBy(r => r.RoleType).Select(r => MapRoleDto(r, conflictReport, songsByCategory)).ToList(),
             ConflictReport = conflictReport
         };

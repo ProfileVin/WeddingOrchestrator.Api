@@ -9,6 +9,8 @@ public class WeddingDto
     public TimeOnly? EndTime { get; set; }
     public string? Location { get; set; }
     public bool IsFinalized { get; set; }
+    public DateTime CreatedUtc { get; set; }
+    public DateTime? UpdatedDate { get; set; }
     public List<WeddingRoleDto> Roles { get; set; } = new();
     public ConflictReportDto? ConflictReport { get; set; }
 }

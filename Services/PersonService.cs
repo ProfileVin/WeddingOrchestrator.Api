@@ -102,6 +102,7 @@ public class PersonService : IPersonService
             .Include(p => p.Mother).ThenInclude(m => m!.Father)
             .Include(p => p.Mother).ThenInclude(m => m!.Mother)
             .Include(p => p.WeddingRoles).ThenInclude(wr => wr.Wedding).ThenInclude(w => w.Roles).ThenInclude(r => r.Person)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(p => p.Id == id)
             ?? throw new KeyNotFoundException($"Person {id} not found.");
 

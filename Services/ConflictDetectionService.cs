@@ -43,6 +43,7 @@ public class ConflictDetectionService : IConflictDetectionService
                 .ThenInclude(r => r.SongAssignments)
                     .ThenInclude(a => a.Song)
                         .ThenInclude(s => s.Category)
+            .AsSplitQuery()
             .ToListAsync();
 
         var report = new ConflictReportDto();

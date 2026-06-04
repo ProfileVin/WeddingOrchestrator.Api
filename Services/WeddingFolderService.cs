@@ -27,6 +27,7 @@ public class WeddingFolderService : IWeddingFolderService
         var wedding = await _db.Weddings
             .Include(w => w.Roles).ThenInclude(r => r.Person)
             .Include(w => w.Roles).ThenInclude(r => r.SongAssignments).ThenInclude(a => a.Song)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(w => w.Id == weddingId)
             ?? throw new KeyNotFoundException($"Wedding {weddingId} not found.");
 
@@ -84,6 +85,7 @@ public class WeddingFolderService : IWeddingFolderService
         var wedding = await _db.Weddings
             .Include(w => w.Roles).ThenInclude(r => r.Person)
             .Include(w => w.Roles).ThenInclude(r => r.SongAssignments).ThenInclude(a => a.Song)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(w => w.Id == weddingId)
             ?? throw new KeyNotFoundException($"Wedding {weddingId} not found.");
 
@@ -183,6 +185,7 @@ public class WeddingFolderService : IWeddingFolderService
         var wedding = await _db.Weddings
             .Include(w => w.Roles).ThenInclude(r => r.Person)
             .Include(w => w.Roles).ThenInclude(r => r.SongAssignments).ThenInclude(a => a.Song)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(w => w.Id == weddingId)
             ?? throw new KeyNotFoundException($"Wedding {weddingId} not found.");
 
@@ -216,6 +219,7 @@ public class WeddingFolderService : IWeddingFolderService
         var wedding = await _db.Weddings
             .Include(w => w.Roles).ThenInclude(r => r.Person)
             .Include(w => w.Roles).ThenInclude(r => r.SongAssignments).ThenInclude(a => a.Song)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(w => w.Id == weddingId)
             ?? throw new KeyNotFoundException($"Wedding {weddingId} not found.");
 
@@ -252,6 +256,7 @@ public class WeddingFolderService : IWeddingFolderService
             .Include(r => r.Wedding).ThenInclude(w => w.Roles).ThenInclude(r2 => r2.Person)
             .Include(r => r.Person)
             .Include(r => r.SongAssignments).ThenInclude(a => a.Song)
+            .AsSplitQuery()
             .Where(r => r.PersonId.HasValue
                      && personIds.Contains(r.PersonId!.Value)
                      && r.WeddingId != excludeWeddingId)

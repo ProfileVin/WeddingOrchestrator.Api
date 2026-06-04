@@ -9,6 +9,7 @@ public class Wedding
     public string? Location { get; set; }
     public bool IsFinalized { get; set; }
     public DateTime CreatedUtc { get; set; }
+    public DateTime? UpdatedDate { get; set; }
 
     public ICollection<WeddingRole> Roles { get; set; } = new List<WeddingRole>();
 }
