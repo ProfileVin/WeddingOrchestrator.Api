@@ -7,6 +7,10 @@ public class CreateWeddingDto
     public TimeOnly? EndTime { get; set; }
     public string? Location { get; set; }
     public string? GroomName { get; set; }
+    public string? GroomFirstName { get; set; }
+    public string? GroomLastName { get; set; }
     public string? BrideName { get; set; }
+    public string? BrideFirstName { get; set; }
+    public string? BrideLastName { get; set; }
     public int? WeddingIntroSongId { get; set; }
 }
