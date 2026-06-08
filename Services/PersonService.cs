@@ -19,10 +19,20 @@ public class PersonService : IPersonService
         var people = await _db.People
             .Include(p => p.Father)
             .Include(p => p.Mother)
+            .Include(p => p.WeddingRoles)
+                .ThenInclude(wr => wr.Wedding)
+                    .ThenInclude(w => w.Roles)
+                        .ThenInclude(r => r.Person)
+            .AsSplitQuery()
             .OrderBy(p => p.LastName).ThenBy(p => p.FirstName)
             .ToListAsync();
 
-        return people.Select(MapDto).ToList();
+        var latestNotes = await _db.PersonNotes
+            .GroupBy(n => n.PersonId)
+            .Select(g => new { PersonId = g.Key, Content = g.OrderByDescending(n => n.CreatedAt).First().Content })
+            .ToDictionaryAsync(x => x.PersonId, x => x.Content);
+
+        return people.Select(p => MapDto(p, latestNotes)).ToList();
     }
 
     public async Task<List<PersonDto>> SearchAsync(string query, RoleType? roleType = null)
@@ -82,7 +92,7 @@ public class PersonService : IPersonService
             .Take(20)
             .ToListAsync();
 
-        return people.Select(MapDto).ToList();
+        return people.Select(p => MapDto(p)).ToList();
     }
 
     public async Task<PersonDto> GetByIdAsync(int id)
@@ -102,6 +112,7 @@ public class PersonService : IPersonService
             .Include(p => p.Mother).ThenInclude(m => m!.Father)
             .Include(p => p.Mother).ThenInclude(m => m!.Mother)
             .Include(p => p.WeddingRoles).ThenInclude(wr => wr.Wedding).ThenInclude(w => w.Roles).ThenInclude(r => r.Person)
+            .Include(p => p.WeddingRoles).ThenInclude(wr => wr.SongAssignments).ThenInclude(sa => sa.Song)
             .AsSplitQuery()
             .FirstOrDefaultAsync(p => p.Id == id)
             ?? throw new KeyNotFoundException($"Person {id} not found.");
@@ -123,10 +134,18 @@ public class PersonService : IPersonService
                 WeddingId = wr.WeddingId,
                 Title = WeddingTitleHelper.Compute(wr.Wedding),
                 Date = wr.Wedding.DateOfWedding.ToString("MMM d, yyyy"),
+                Location = wr.Wedding.Location,
                 Role = RoleHelper.GetLabel(wr.RoleType),
-                IsFinalized = wr.Wedding.IsFinalized
+                IsFinalized = wr.Wedding.IsFinalized,
+                SongTitle = wr.SongAssignments.FirstOrDefault()?.Song?.Title
             })
             .ToList();
+
+        var notes = await _db.PersonNotes
+            .Where(n => n.PersonId == id)
+            .Include(n => n.Wedding).ThenInclude(w => w!.Roles).ThenInclude(r => r.Person)
+            .OrderByDescending(n => n.CreatedAt)
+            .ToListAsync();
 
         var profile = new PersonProfileDto
         {
@@ -142,7 +161,18 @@ public class PersonService : IPersonService
             PaternalGrandmother = person.Father?.Mother != null ? ToSummary(person.Father.Mother) : null,
             MaternalGrandfather = person.Mother?.Father != null ? ToSummary(person.Mother.Father) : null,
             MaternalGrandmother = person.Mother?.Mother != null ? ToSummary(person.Mother.Mother) : null,
-            Weddings = weddings
+            Weddings = weddings,
+            Notes = notes.Select(n => new PersonNoteDto
+            {
+                Id = n.Id,
+                PersonId = n.PersonId,
+                WeddingId = n.WeddingId,
+                WeddingTitle = n.Wedding != null
+                    ? $"{WeddingTitleHelper.Compute(n.Wedding)} ({n.Wedding.DateOfWedding.Year})"
+                    : null,
+                Content = n.Content,
+                CreatedAt = n.CreatedAt,
+            }).ToList(),
         };
 
         AugmentProfileFromWeddingRoles(person, profile);
@@ -215,7 +245,8 @@ public class PersonService : IPersonService
             LastName = dto.LastName.Trim(),
             Gender = dto.Gender,
             FatherId = dto.FatherId,
-            MotherId = dto.MotherId
+            MotherId = dto.MotherId,
+            FamilyGroup = dto.FamilyGroup?.Trim(),
         };
         _db.People.Add(person);
         await _db.SaveChangesAsync();
@@ -232,6 +263,7 @@ public class PersonService : IPersonService
         person.Gender = dto.Gender;
         person.FatherId = dto.FatherId;
         person.MotherId = dto.MotherId;
+        person.FamilyGroup = dto.FamilyGroup?.Trim();
 
         await _db.SaveChangesAsync();
         return await GetByIdAsync(id);
@@ -260,13 +292,40 @@ public class PersonService : IPersonService
         .Include(p => p.Mother).ThenInclude(m => m!.Father)
         .Include(p => p.Mother).ThenInclude(m => m!.Mother);
 
-    private static PersonDto MapDto(Person p) => new()
+    private static string? ComputeFamilyGroup(Person p)
+    {
+        var wedding = p.WeddingRoles?
+            .Where(wr => wr.RoleType != RoleType.WeddingItself && wr.Wedding != null)
+            .OrderByDescending(wr => wr.Wedding.DateOfWedding)
+            .Select(wr => wr.Wedding)
+            .FirstOrDefault();
+
+        if (wedding?.Roles == null) return null;
+
+        var groomLastName = wedding.Roles
+            .FirstOrDefault(r => r.RoleType == RoleType.Groom)?.Person?.LastName;
+        var brideLastName = wedding.Roles
+            .FirstOrDefault(r => r.RoleType == RoleType.Bride)?.Person?.LastName;
+
+        return (groomLastName, brideLastName) switch
+        {
+            (not null, not null) => $"{groomLastName} - {brideLastName}",
+            (not null, null)     => groomLastName,
+            (null, not null)     => brideLastName,
+            _                    => null
+        };
+    }
+
+    private static PersonDto MapDto(Person p, Dictionary<int, string>? latestNotes = null) => new()
     {
         Id = p.Id,
         FirstName = p.FirstName,
         LastName = p.LastName,
         FullName = p.FullName,
         Gender = p.Gender.ToString().ToLower(),
+        FamilyGroup = ComputeFamilyGroup(p),
+        WeddingCount = p.WeddingRoles?.Count(wr => wr.RoleType != RoleType.WeddingItself) ?? 0,
+        LastNote = latestNotes?.GetValueOrDefault(p.Id),
         FatherId = p.FatherId,
         FatherName = p.Father?.FullName,
         MotherId = p.MotherId,

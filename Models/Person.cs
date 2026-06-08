@@ -9,6 +9,8 @@ public class Person
     public string LastName { get; set; } = string.Empty;
     public Gender Gender { get; set; }
 
+    public string? FamilyGroup { get; set; }
+
     public int? FatherId { get; set; }
     public int? MotherId { get; set; }
 
