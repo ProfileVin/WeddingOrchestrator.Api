@@ -7,6 +7,9 @@ public class PersonDto
     public string LastName { get; set; } = string.Empty;
     public string FullName { get; set; } = string.Empty;
     public string Gender { get; set; } = string.Empty;
+    public string? FamilyGroup { get; set; }
+    public int WeddingCount { get; set; }
+    public string? LastNote { get; set; }
 
     public int? FatherId { get; set; }
     public string? FatherName { get; set; }

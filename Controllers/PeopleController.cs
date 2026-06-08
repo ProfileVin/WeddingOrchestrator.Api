@@ -10,8 +10,13 @@ namespace WeddingOrchestrator.Api.Controllers;
 public class PeopleController : ControllerBase
 {
     private readonly IPersonService _people;
+    private readonly IPersonNoteService _notes;
 
-    public PeopleController(IPersonService people) => _people = people;
+    public PeopleController(IPersonService people, IPersonNoteService notes)
+    {
+        _people = people;
+        _notes = notes;
+    }
 
     [HttpGet]
     public async Task<IActionResult> GetAll() =>
@@ -44,6 +49,27 @@ public class PeopleController : ControllerBase
     public async Task<IActionResult> Delete(int id)
     {
         await _people.DeleteAsync(id);
+        return NoContent();
+    }
+
+    // ── Notes ─────────────────────────────────────────────────────────────────
+
+    [HttpGet("{personId:int}/notes")]
+    public async Task<IActionResult> GetNotes(int personId) =>
+        Ok(await _notes.GetByPersonAsync(personId));
+
+    [HttpPost("{personId:int}/notes")]
+    public async Task<IActionResult> CreateNote(int personId, [FromBody] CreatePersonNoteDto dto) =>
+        Ok(await _notes.CreateAsync(personId, dto));
+
+    [HttpPut("{personId:int}/notes/{noteId:int}")]
+    public async Task<IActionResult> UpdateNote(int personId, int noteId, [FromBody] UpdatePersonNoteDto dto) =>
+        Ok(await _notes.UpdateAsync(noteId, dto));
+
+    [HttpDelete("{personId:int}/notes/{noteId:int}")]
+    public async Task<IActionResult> DeleteNote(int personId, int noteId)
+    {
+        await _notes.DeleteAsync(noteId);
         return NoContent();
     }
 }
