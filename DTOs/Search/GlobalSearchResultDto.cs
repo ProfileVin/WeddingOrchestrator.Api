@@ -15,8 +15,18 @@ public class SearchSongResult
     public string CategoryName { get; set; } = string.Empty;
 }
 
+public class SearchWeddingResult
+{
+    public int Id { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public string Date { get; set; } = string.Empty;
+    public string? Location { get; set; }
+    public bool IsFinalized { get; set; }
+}
+
 public class GlobalSearchResultDto
 {
     public List<SearchPersonResult> People { get; set; } = new();
     public List<SearchSongResult> Songs { get; set; } = new();
+    public List<SearchWeddingResult> Weddings { get; set; } = new();
 }
