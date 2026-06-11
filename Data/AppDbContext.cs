@@ -15,6 +15,8 @@ public class AppDbContext : DbContext
     public DbSet<WeddingRole> WeddingRoles => Set<WeddingRole>();
     public DbSet<WeddingRoleSongAssignment> WeddingRoleSongAssignments => Set<WeddingRoleSongAssignment>();
     public DbSet<PersonNote> PersonNotes => Set<PersonNote>();
+    public DbSet<RelationshipType> RelationshipTypes => Set<RelationshipType>();
+    public DbSet<PersonRelationship> PersonRelationships => Set<PersonRelationship>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -97,6 +99,63 @@ public class AppDbContext : DbContext
              .HasForeignKey(a => a.SongId)
              .OnDelete(DeleteBehavior.Restrict);
         });
+
+        // ── RelationshipType ───────────────────────────────────────────────
+        modelBuilder.Entity<RelationshipType>(e =>
+        {
+            e.Property(r => r.TypeCode).HasMaxLength(50).IsRequired();
+            e.Property(r => r.TypeLabel).HasMaxLength(100).IsRequired();
+            e.Property(r => r.Category).HasMaxLength(20).IsRequired();
+            e.HasIndex(r => r.TypeCode).IsUnique();
+        });
+
+        // ── PersonRelationship ─────────────────────────────────────────────
+        modelBuilder.Entity<PersonRelationship>(e =>
+        {
+            e.HasOne(r => r.FromPerson).WithMany().HasForeignKey(r => r.FromPersonId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(r => r.ToPerson).WithMany().HasForeignKey(r => r.ToPersonId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(r => r.RelationshipType).WithMany(rt => rt.Relationships).HasForeignKey(r => r.RelationshipTypeId).OnDelete(DeleteBehavior.Restrict);
+            e.HasIndex(r => new { r.FromPersonId, r.ToPersonId, r.RelationshipTypeId }).IsUnique();
+        });
+
+        // ── Seed: RelationshipTypes ────────────────────────────────────────
+        modelBuilder.Entity<RelationshipType>().HasData(
+            new RelationshipType { Id =  1, TypeCode = "FATHER",           TypeLabel = "Father",           Category = "DIRECT",   GenerationDelta =  1 },
+            new RelationshipType { Id =  2, TypeCode = "MOTHER",           TypeLabel = "Mother",           Category = "DIRECT",   GenerationDelta =  1 },
+            new RelationshipType { Id =  3, TypeCode = "SON",              TypeLabel = "Son",              Category = "DIRECT",   GenerationDelta = -1 },
+            new RelationshipType { Id =  4, TypeCode = "DAUGHTER",         TypeLabel = "Daughter",         Category = "DIRECT",   GenerationDelta = -1 },
+            new RelationshipType { Id =  5, TypeCode = "HUSBAND",          TypeLabel = "Husband",          Category = "DIRECT",   GenerationDelta =  0 },
+            new RelationshipType { Id =  6, TypeCode = "WIFE",             TypeLabel = "Wife",             Category = "DIRECT",   GenerationDelta =  0 },
+            new RelationshipType { Id =  7, TypeCode = "BROTHER",          TypeLabel = "Brother",          Category = "DIRECT",   GenerationDelta =  0 },
+            new RelationshipType { Id =  8, TypeCode = "SISTER",           TypeLabel = "Sister",           Category = "DIRECT",   GenerationDelta =  0 },
+            new RelationshipType { Id =  9, TypeCode = "GRANDFATHER",      TypeLabel = "Grandfather",      Category = "EXTENDED", GenerationDelta =  2 },
+            new RelationshipType { Id = 10, TypeCode = "GRANDMOTHER",      TypeLabel = "Grandmother",      Category = "EXTENDED", GenerationDelta =  2 },
+            new RelationshipType { Id = 11, TypeCode = "GRANDSON",         TypeLabel = "Grandson",         Category = "EXTENDED", GenerationDelta = -2 },
+            new RelationshipType { Id = 12, TypeCode = "GRANDDAUGHTER",    TypeLabel = "Granddaughter",    Category = "EXTENDED", GenerationDelta = -2 },
+            new RelationshipType { Id = 13, TypeCode = "UNCLE",            TypeLabel = "Uncle",            Category = "EXTENDED", GenerationDelta =  1 },
+            new RelationshipType { Id = 14, TypeCode = "AUNT",             TypeLabel = "Aunt",             Category = "EXTENDED", GenerationDelta =  1 },
+            new RelationshipType { Id = 15, TypeCode = "NEPHEW",           TypeLabel = "Nephew",           Category = "EXTENDED", GenerationDelta = -1 },
+            new RelationshipType { Id = 16, TypeCode = "NIECE",            TypeLabel = "Niece",            Category = "EXTENDED", GenerationDelta = -1 },
+            new RelationshipType { Id = 17, TypeCode = "COUSIN",           TypeLabel = "Cousin",           Category = "EXTENDED", GenerationDelta =  0 },
+            new RelationshipType { Id = 18, TypeCode = "FATHER_IN_LAW",    TypeLabel = "Father-in-law",    Category = "INLAW",    GenerationDelta =  1 },
+            new RelationshipType { Id = 19, TypeCode = "MOTHER_IN_LAW",    TypeLabel = "Mother-in-law",    Category = "INLAW",    GenerationDelta =  1 },
+            new RelationshipType { Id = 20, TypeCode = "SON_IN_LAW",       TypeLabel = "Son-in-law",       Category = "INLAW",    GenerationDelta = -1 },
+            new RelationshipType { Id = 21, TypeCode = "DAUGHTER_IN_LAW",  TypeLabel = "Daughter-in-law",  Category = "INLAW",    GenerationDelta = -1 },
+            new RelationshipType { Id = 22, TypeCode = "BROTHER_IN_LAW",   TypeLabel = "Brother-in-law",   Category = "INLAW",    GenerationDelta =  0 },
+            new RelationshipType { Id = 23, TypeCode = "SISTER_IN_LAW",    TypeLabel = "Sister-in-law",    Category = "INLAW",    GenerationDelta =  0 },
+            new RelationshipType { Id = 24, TypeCode = "STEP_FATHER",      TypeLabel = "Step-father",      Category = "STEP",     GenerationDelta =  1 },
+            new RelationshipType { Id = 25, TypeCode = "STEP_MOTHER",      TypeLabel = "Step-mother",      Category = "STEP",     GenerationDelta =  1 },
+            new RelationshipType { Id = 26, TypeCode = "STEP_SON",         TypeLabel = "Step-son",         Category = "STEP",     GenerationDelta = -1 },
+            new RelationshipType { Id = 27, TypeCode = "STEP_DAUGHTER",    TypeLabel = "Step-daughter",    Category = "STEP",     GenerationDelta = -1 },
+            new RelationshipType { Id = 28, TypeCode = "STEP_BROTHER",     TypeLabel = "Step-brother",     Category = "STEP",     GenerationDelta =  0 },
+            new RelationshipType { Id = 29, TypeCode = "STEP_SISTER",      TypeLabel = "Step-sister",      Category = "STEP",     GenerationDelta =  0 },
+            new RelationshipType { Id = 30, TypeCode = "ADOPTIVE_FATHER",  TypeLabel = "Adoptive Father",  Category = "ADOPTED",  GenerationDelta =  1 },
+            new RelationshipType { Id = 31, TypeCode = "ADOPTIVE_MOTHER",  TypeLabel = "Adoptive Mother",  Category = "ADOPTED",  GenerationDelta =  1 },
+            new RelationshipType { Id = 32, TypeCode = "ADOPTED_SON",      TypeLabel = "Adopted Son",      Category = "ADOPTED",  GenerationDelta = -1 },
+            new RelationshipType { Id = 33, TypeCode = "ADOPTED_DAUGHTER", TypeLabel = "Adopted Daughter", Category = "ADOPTED",  GenerationDelta = -1 },
+            new RelationshipType { Id = 34, TypeCode = "HALF_BROTHER",     TypeLabel = "Half-brother",     Category = "HALF",     GenerationDelta =  0 },
+            new RelationshipType { Id = 35, TypeCode = "HALF_SISTER",      TypeLabel = "Half-sister",      Category = "HALF",     GenerationDelta =  0 }
+        );
 
         // ── Seed: SongCategories ───────────────────────────────────────────
         modelBuilder.Entity<SongCategory>().HasData(
