@@ -125,6 +125,8 @@ public class WeddingService : IWeddingService
         }
 
         await _db.SaveChangesAsync();
+        await SyncFamilyLinksAsync(wedding.Id);
+        await SyncPersonRelationshipsAsync(wedding.Id);
 
         return await GetByIdAsync(wedding.Id);
     }
@@ -132,6 +134,12 @@ public class WeddingService : IWeddingService
     public async Task<WeddingDto> UpdateRolesAsync(int id, WeddingFamilyTreeDto dto)
     {
         var (wedding, _) = await LoadFullWedding(id);
+
+        // Snapshot person IDs before the update so stale relationships can be cleaned up
+        var previousPersonIds = wedding.Roles
+            .Where(r => r.PersonId.HasValue)
+            .Select(r => r.PersonId!.Value)
+            .ToHashSet();
 
         foreach (var slotInput in dto.Roles)
         {
@@ -145,6 +153,8 @@ public class WeddingService : IWeddingService
                 role.PersonId = slotInput.PersonId;
             else if (!string.IsNullOrWhiteSpace(slotInput.FreeTextName))
                 role.PersonId = await FindOrCreatePersonByNameAsync(slotInput.FreeTextName, roleGender);
+            else if (role.RoleType is RoleType.Groom or RoleType.Bride && role.PersonId.HasValue)
+                continue; // never silently clear Groom/Bride — they require an explicit replacement
             else
                 role.PersonId = null;
 
@@ -164,7 +174,7 @@ public class WeddingService : IWeddingService
         wedding.UpdatedDate = DateTime.Now;
         await _db.SaveChangesAsync();
         await SyncFamilyLinksAsync(id);
-        await SyncPersonRelationshipsAsync(id);
+        await SyncPersonRelationshipsAsync(id, previousPersonIds);
         return await GetByIdAsync(id);
     }
 
@@ -206,46 +216,69 @@ public class WeddingService : IWeddingService
         if (changed) await _db.SaveChangesAsync();
     }
 
-    private async Task SyncPersonRelationshipsAsync(int weddingId)
+    private async Task SyncPersonRelationshipsAsync(int weddingId, HashSet<int>? previousPersonIds = null)
     {
         var roles = await _db.WeddingRoles
             .Where(r => r.WeddingId == weddingId && r.PersonId.HasValue)
             .ToDictionaryAsync(r => r.RoleType, r => r.PersonId!.Value);
 
-        // (childRole, parentRole, childTypeId, parentTypeId)
-        // Type IDs match RelationshipTypes seed: 1=FATHER,2=MOTHER,3=SON,4=DAUGHTER,
-        // 5=HUSBAND,6=WIFE,18=FATHER_IN_LAW,19=MOTHER_IN_LAW,20=SON_IN_LAW,21=DAUGHTER_IN_LAW
+        // Build the complete expected set of sync-managed relationships for this wedding.
+        // Type IDs: 1=FATHER,2=MOTHER,3=SON,4=DAUGHTER,5=HUSBAND,6=WIFE,
+        //           9=GRANDFATHER,10=GRANDMOTHER,11=GRANDSON,12=GRANDDAUGHTER,
+        //           18=FATHER_IN_LAW,19=MOTHER_IN_LAW,20=SON_IN_LAW,21=DAUGHTER_IN_LAW
+        var expected = new HashSet<(int From, int To, int Type)>();
+
         var parentChildPairs = new (RoleType child, RoleType parent, int childTypeId, int parentTypeId)[]
         {
-            (RoleType.Groom,         RoleType.FatherOfGroom,             3, 1),
-            (RoleType.Groom,         RoleType.MotherOfGroom,             3, 2),
-            (RoleType.Bride,         RoleType.FatherOfBride,             4, 1),
-            (RoleType.Bride,         RoleType.MotherOfBride,             4, 2),
-            (RoleType.FatherOfGroom, RoleType.PaternalGrandfatherOfGroom, 3, 1),
-            (RoleType.FatherOfGroom, RoleType.PaternalGrandmotherOfGroom, 3, 2),
-            (RoleType.MotherOfGroom, RoleType.MaternalGrandfatherOfGroom, 4, 1),
-            (RoleType.MotherOfGroom, RoleType.MaternalGrandmotherOfGroom, 4, 2),
-            (RoleType.FatherOfBride, RoleType.PaternalGrandfatherOfBride, 3, 1),
-            (RoleType.FatherOfBride, RoleType.PaternalGrandmotherOfBride, 3, 2),
-            (RoleType.MotherOfBride, RoleType.MaternalGrandfatherOfBride, 4, 1),
-            (RoleType.MotherOfBride, RoleType.MaternalGrandmotherOfBride, 4, 2),
+            (RoleType.Groom,         RoleType.FatherOfGroom,              3,  1),
+            (RoleType.Groom,         RoleType.MotherOfGroom,              3,  2),
+            (RoleType.Bride,         RoleType.FatherOfBride,              4,  1),
+            (RoleType.Bride,         RoleType.MotherOfBride,              4,  2),
+            (RoleType.FatherOfGroom, RoleType.PaternalGrandfatherOfGroom, 3,  1),
+            (RoleType.FatherOfGroom, RoleType.PaternalGrandmotherOfGroom, 3,  2),
+            (RoleType.MotherOfGroom, RoleType.MaternalGrandfatherOfGroom, 4,  1),
+            (RoleType.MotherOfGroom, RoleType.MaternalGrandmotherOfGroom, 4,  2),
+            (RoleType.FatherOfBride, RoleType.PaternalGrandfatherOfBride, 3,  1),
+            (RoleType.FatherOfBride, RoleType.PaternalGrandmotherOfBride, 3,  2),
+            (RoleType.MotherOfBride, RoleType.MaternalGrandfatherOfBride, 4,  1),
+            (RoleType.MotherOfBride, RoleType.MaternalGrandmotherOfBride, 4,  2),
+            // Groom ↔ all four of his grandparents
+            (RoleType.Groom,         RoleType.PaternalGrandfatherOfGroom, 11, 9),
+            (RoleType.Groom,         RoleType.PaternalGrandmotherOfGroom, 11, 10),
+            (RoleType.Groom,         RoleType.MaternalGrandfatherOfGroom, 11, 9),
+            (RoleType.Groom,         RoleType.MaternalGrandmotherOfGroom, 11, 10),
+            // Bride ↔ all four of her grandparents
+            (RoleType.Bride,         RoleType.PaternalGrandfatherOfBride, 12, 9),
+            (RoleType.Bride,         RoleType.PaternalGrandmotherOfBride, 12, 10),
+            (RoleType.Bride,         RoleType.MaternalGrandfatherOfBride, 12, 9),
+            (RoleType.Bride,         RoleType.MaternalGrandmotherOfBride, 12, 10),
         };
 
         foreach (var (childRole, parentRole, childTypeId, parentTypeId) in parentChildPairs)
         {
             if (!roles.TryGetValue(childRole, out var childId) || !roles.TryGetValue(parentRole, out var parentId)) continue;
-            await TryAddRelAsync(childId, parentId, childTypeId);
-            await TryAddRelAsync(parentId, childId, parentTypeId);
+            expected.Add((childId, parentId, childTypeId));
+            expected.Add((parentId, childId, parentTypeId));
         }
 
-        // Spouse
-        if (roles.TryGetValue(RoleType.Groom, out var groomId) && roles.TryGetValue(RoleType.Bride, out var brideId))
+        // Spouse pairs: Groom↔Bride plus each parent couple and each grandparent couple
+        var spouseRolePairs = new (RoleType husband, RoleType wife)[]
         {
-            await TryAddRelAsync(groomId, brideId, 5); // HUSBAND
-            await TryAddRelAsync(brideId, groomId, 6); // WIFE
+            (RoleType.Groom,                        RoleType.Bride),
+            (RoleType.FatherOfGroom,                RoleType.MotherOfGroom),
+            (RoleType.FatherOfBride,                RoleType.MotherOfBride),
+            (RoleType.PaternalGrandfatherOfGroom,   RoleType.PaternalGrandmotherOfGroom),
+            (RoleType.MaternalGrandfatherOfGroom,   RoleType.MaternalGrandmotherOfGroom),
+            (RoleType.PaternalGrandfatherOfBride,   RoleType.PaternalGrandmotherOfBride),
+            (RoleType.MaternalGrandfatherOfBride,   RoleType.MaternalGrandmotherOfBride),
+        };
+        foreach (var (husbandRole, wifeRole) in spouseRolePairs)
+        {
+            if (!roles.TryGetValue(husbandRole, out var hId) || !roles.TryGetValue(wifeRole, out var wId)) continue;
+            expected.Add((hId, wId, 5)); // HUSBAND
+            expected.Add((wId, hId, 6)); // WIFE
         }
 
-        // In-laws
         var inLawPairs = new (RoleType person, RoleType inLaw, int personTypeId, int inLawTypeId)[]
         {
             (RoleType.Groom, RoleType.FatherOfBride, 20, 18),
@@ -257,23 +290,51 @@ public class WeddingService : IWeddingService
         foreach (var (person, inLaw, personTypeId, inLawTypeId) in inLawPairs)
         {
             if (!roles.TryGetValue(person, out var personId) || !roles.TryGetValue(inLaw, out var inLawId)) continue;
-            await TryAddRelAsync(personId, inLawId, personTypeId);
-            await TryAddRelAsync(inLawId, personId, inLawTypeId);
+            expected.Add((personId, inLawId, personTypeId));
+            expected.Add((inLawId, personId, inLawTypeId));
         }
-    }
 
-    private async Task TryAddRelAsync(int fromId, int toId, int typeId)
-    {
-        if (fromId == toId) return;
-        var exists = await _db.PersonRelationships.AnyAsync(r =>
-            r.FromPersonId == fromId && r.ToPersonId == toId && r.RelationshipTypeId == typeId);
-        if (!exists)
+        // Load all existing sync-managed relationships for everyone involved
+        var syncTypeIds = new HashSet<int> { 1, 2, 3, 4, 5, 6, 9, 10, 11, 12, 18, 19, 20, 21 };
+        var allAffectedIds = roles.Values.ToHashSet();
+        if (previousPersonIds != null) allAffectedIds.UnionWith(previousPersonIds);
+
+        // AND condition: only touch relationships where BOTH parties belong to this wedding's
+        // affected set. OR would load relationships with people from other weddings and delete them.
+        var existing = allAffectedIds.Count == 0
+            ? new List<PersonRelationship>()
+            : await _db.PersonRelationships
+                .Where(r => allAffectedIds.Contains(r.FromPersonId)
+                         && allAffectedIds.Contains(r.ToPersonId)
+                         && syncTypeIds.Contains(r.RelationshipTypeId))
+                .ToListAsync();
+
+        // Remove only truly stale entries (in DB but not expected by current wedding state)
+        var toRemove = existing
+            .Where(r => !expected.Contains((r.FromPersonId, r.ToPersonId, r.RelationshipTypeId)))
+            .ToList();
+        if (toRemove.Count > 0)
+        {
+            _db.PersonRelationships.RemoveRange(toRemove);
+            await _db.SaveChangesAsync();
+        }
+
+        // Add only missing relationships (expected but absent from DB)
+        var existingSet = existing
+            .Select(r => (r.FromPersonId, r.ToPersonId, r.RelationshipTypeId))
+            .ToHashSet();
+        var added = false;
+        foreach (var (from, to, type) in expected)
+        {
+            if (from == to || existingSet.Contains((from, to, type))) continue;
             _db.PersonRelationships.Add(new PersonRelationship
             {
-                FromPersonId = fromId, ToPersonId = toId,
-                RelationshipTypeId = typeId, IsActive = true, CreatedAt = DateTime.UtcNow
+                FromPersonId = from, ToPersonId = to,
+                RelationshipTypeId = type, IsActive = true, CreatedAt = DateTime.UtcNow
             });
-        await _db.SaveChangesAsync();
+            added = true;
+        }
+        if (added) await _db.SaveChangesAsync();
     }
 
     public async Task<WeddingDto> AssignSongsAsync(int id, AssignSongsDto dto)
@@ -283,24 +344,31 @@ public class WeddingService : IWeddingService
         var conflictReport = await _conflicts.GetConflictReportAsync(id);
         var forbiddenIds = conflictReport.ForbiddenSongIds.ToHashSet();
 
+        // Validate all incoming assignments before making any changes
         foreach (var input in dto.Assignments)
         {
             if (forbiddenIds.Contains(input.SongId))
                 throw new DomainException($"Song {input.SongId} is forbidden for this wedding.");
+            if (!wedding.Roles.Any(r => r.Id == input.WeddingRoleId))
+                throw new KeyNotFoundException($"WeddingRole {input.WeddingRoleId} not found.");
+        }
 
-            var role = wedding.Roles.FirstOrDefault(r => r.Id == input.WeddingRoleId)
-                ?? throw new KeyNotFoundException($"WeddingRole {input.WeddingRoleId} not found.");
+        // Remove all existing assignments so cleared slots are actually deleted
+        foreach (var role in wedding.Roles)
+        {
+            _db.RemoveRange(role.SongAssignments);
+            role.SongAssignments.Clear();
+        }
 
-            // SongAssignments already loaded — no extra DB query
-            var existing = role.SongAssignments.FirstOrDefault(a => a.AssignmentSlot == input.AssignmentSlot);
-            if (existing != null)
-                existing.SongId = input.SongId;
-            else
-                role.SongAssignments.Add(new WeddingRoleSongAssignment
-                {
-                    SongId = input.SongId,
-                    AssignmentSlot = input.AssignmentSlot
-                });
+        // Re-add only the assignments the client sent
+        foreach (var input in dto.Assignments)
+        {
+            var role = wedding.Roles.First(r => r.Id == input.WeddingRoleId);
+            role.SongAssignments.Add(new WeddingRoleSongAssignment
+            {
+                SongId = input.SongId,
+                AssignmentSlot = input.AssignmentSlot
+            });
         }
 
         wedding.UpdatedDate = DateTime.Now;
@@ -363,11 +431,39 @@ public class WeddingService : IWeddingService
             .OrderBy(r => r.RoleType)
             .ToListAsync();
 
-        return roles
-            .SelectMany(r => r.SongAssignments
-                .OrderBy(a => a.AssignmentSlot)
-                .Select(a => (RoleHelper.GetLabel(r.RoleType), r.Person?.FullName ?? string.Empty, a.Song.Title, a.Song.RelativeFilePath)))
-            .ToList();
+        var roleMap = roles.ToDictionary(r => r.RoleType);
+        var result = new List<(string, string, string, string)>();
+
+        // Slot-2 mother roles are skipped — their intro is combined with the father entry
+        var skipSlot2 = new HashSet<RoleType> { RoleType.MotherOfGroom, RoleType.MotherOfBride };
+
+        foreach (var role in roles)
+        {
+            foreach (var assignment in role.SongAssignments.OrderBy(a => a.AssignmentSlot))
+            {
+                if (assignment.AssignmentSlot == 2 && skipSlot2.Contains(role.RoleType))
+                    continue;
+
+                if (assignment.AssignmentSlot == 2 &&
+                    (role.RoleType == RoleType.FatherOfGroom || role.RoleType == RoleType.FatherOfBride))
+                {
+                    var motherType = role.RoleType == RoleType.FatherOfGroom
+                        ? RoleType.MotherOfGroom
+                        : RoleType.MotherOfBride;
+                    var motherName = roleMap.TryGetValue(motherType, out var mr) ? mr.Person?.FullName : null;
+                    var fatherName = role.Person?.FullName;
+                    var combined = string.Join(" & ",
+                        new[] { fatherName, motherName }.Where(n => !string.IsNullOrWhiteSpace(n)));
+                    result.Add(("Intro for Father/Mother", combined, assignment.Song.Title, assignment.Song.RelativeFilePath));
+                }
+                else
+                {
+                    result.Add((RoleHelper.GetLabel(role.RoleType), role.Person?.FullName ?? string.Empty, assignment.Song.Title, assignment.Song.RelativeFilePath));
+                }
+            }
+        }
+
+        return result;
     }
 
     private async Task<WeddingDto> BuildWeddingDtoAsync(int id, ConflictReportDto conflictReport)
@@ -489,9 +585,9 @@ public class WeddingService : IWeddingService
     private static WeddingRoleDto MapRoleDto(WeddingRole role, ConflictReportDto? conflictReport, Dictionary<int, List<Song>> songsByCategory)
     {
         var forbiddenIds = conflictReport?.ForbiddenSongIds.ToHashSet() ?? new HashSet<int>();
-        var primaryCategoryIds = RoleHelper.GetRequiredSlots(role.RoleType)
-            .Select(s => s.categoryId)
-            .ToHashSet();
+        var requiredSlots = RoleHelper.GetRequiredSlots(role.RoleType);
+        var primaryCategoryIds = requiredSlots.Select(s => s.categoryId).ToHashSet();
+        var categorySlotMap = requiredSlots.ToDictionary(x => x.categoryId, x => x.slot);
 
         var availableSongs = songsByCategory.Values
             .SelectMany(songs => songs.Select(s => new AvailableSongDto
@@ -500,7 +596,7 @@ public class WeddingService : IWeddingService
                 Title = s.Title,
                 CategoryId = s.SongCategoryId,
                 CategoryName = s.Category?.Name ?? string.Empty,
-                AssignmentSlot = 1,
+                AssignmentSlot = categorySlotMap.TryGetValue(s.SongCategoryId, out var sl) ? sl : 1,
                 IsForbidden = forbiddenIds.Contains(s.Id),
                 IsPrimaryCategory = primaryCategoryIds.Contains(s.SongCategoryId)
             }))
@@ -516,6 +612,8 @@ public class WeddingService : IWeddingService
             RoleLabel = RoleHelper.GetLabel(role.RoleType),
             PersonId = role.PersonId,
             PersonName = role.Person?.FullName,
+            PersonFirstName = role.Person?.FirstName,
+            PersonLastName = role.Person?.LastName,
             SongAssignments = role.SongAssignments.Select(a => new SongAssignmentDto
             {
                 AssignmentSlot = a.AssignmentSlot,

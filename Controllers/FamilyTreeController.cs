@@ -11,6 +11,10 @@ public class FamilyTreeController : ControllerBase
     private readonly IFamilyTreeService _service;
     public FamilyTreeController(IFamilyTreeService service) => _service = service;
 
+    [HttpGet("summaries")]
+    public async Task<ActionResult<FamilySummariesResponseDto>> GetFamilySummaries()
+        => Ok(await _service.GetFamilySummariesAsync());
+
     [HttpGet("relationship-types")]
     public async Task<ActionResult<List<RelationshipTypeDto>>> GetRelationshipTypes()
         => Ok(await _service.GetRelationshipTypesAsync());

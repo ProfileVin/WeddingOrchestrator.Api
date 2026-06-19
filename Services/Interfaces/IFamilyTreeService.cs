@@ -4,6 +4,7 @@ namespace WeddingOrchestrator.Api.Services.Interfaces;
 
 public interface IFamilyTreeService
 {
+    Task<FamilySummariesResponseDto> GetFamilySummariesAsync();
     Task<List<RelationshipTypeDto>> GetRelationshipTypesAsync();
     Task<FamilyTreeDataDto> GetFamilyTreeByLastNameAsync(string lastName);
     Task<List<PersonRelationshipDto>> GetPersonRelationshipsAsync(int personId);

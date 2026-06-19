@@ -11,8 +11,6 @@ namespace WeddingOrchestrator.Api.Controllers;
 [Route("api/search")]
 public class SearchController : ControllerBase
 {
-    private static readonly string[] TitleSeparator = [" - "];
-
     private readonly AppDbContext _db;
 
     public SearchController(AppDbContext db) => _db = db;
@@ -28,7 +26,9 @@ public class SearchController : ControllerBase
 
         var rawPeople = await _db.People
             .Include(p => p.WeddingRoles)
-            .Where(p => p.FirstName.ToLower().Contains(lowerTerm) || p.LastName.ToLower().Contains(lowerTerm))
+            .Where(p => p.FirstName.ToLower().Contains(lowerTerm)
+                     || p.LastName.ToLower().Contains(lowerTerm)
+                     || (p.FirstName.ToLower() + " " + p.LastName.ToLower()).Contains(lowerTerm))
             .OrderBy(p => p.LastName).ThenBy(p => p.FirstName)
             .Take(10)
             .ToListAsync();
@@ -57,6 +57,7 @@ public class SearchController : ControllerBase
         {
             Id = s.Id,
             Title = s.Title,
+            CategoryId = s.SongCategoryId,
             CategoryName = s.Category?.Name ?? string.Empty
         }).ToList();
 
@@ -65,25 +66,33 @@ public class SearchController : ControllerBase
             .Where(w => (w.Location != null && w.Location.ToLower().Contains(lowerTerm))
                 || w.Roles.Any(r => r.Person != null &&
                     (r.Person.FirstName.ToLower().Contains(lowerTerm) ||
-                     r.Person.LastName.ToLower().Contains(lowerTerm))))
+                     r.Person.LastName.ToLower().Contains(lowerTerm) ||
+                     (r.Person.FirstName.ToLower() + " " + r.Person.LastName.ToLower()).Contains(lowerTerm))))
             .Select(w => w.Id)
             .ToListAsync();
 
-        // Also match the computed title format "GroomLastName - BrideLastName"
-        var titleParts = lowerTerm.Split(TitleSeparator, StringSplitOptions.RemoveEmptyEntries);
-        if (titleParts.Length == 2)
+        // Also match the computed title format "GroomLastName - BrideLastName" (partial typing supported)
+        // Detect " -" so results appear even before the user finishes typing " - BrideName"
+        var dashIndex = lowerTerm.IndexOf(" -", StringComparison.Ordinal);
+        if (dashIndex >= 0)
         {
-            var p0 = titleParts[0].Trim();
-            var p1 = titleParts[1].Trim();
-            var titleMatchIds = await _db.Weddings
-                .Where(w =>
-                    w.Roles.Any(r => r.RoleType == RoleType.Groom && r.Person != null
-                        && r.Person.LastName.ToLower().Contains(p0))
-                    && w.Roles.Any(r => r.RoleType == RoleType.Bride && r.Person != null
-                        && r.Person.LastName.ToLower().Contains(p1)))
-                .Select(w => w.Id)
-                .ToListAsync();
-            weddingIds = weddingIds.Union(titleMatchIds).ToList();
+            var groomPart = lowerTerm[..dashIndex].Trim();
+            var bridePart = lowerTerm[(dashIndex + 2)..].TrimStart().Trim();
+
+            if (!string.IsNullOrEmpty(groomPart))
+            {
+                var gp = groomPart;
+                var bp = bridePart;
+                var titleMatchIds = await _db.Weddings
+                    .Where(w =>
+                        w.Roles.Any(r => r.RoleType == RoleType.Groom && r.Person != null
+                            && r.Person.LastName.ToLower().Contains(gp))
+                        && (bp == string.Empty || w.Roles.Any(r => r.RoleType == RoleType.Bride && r.Person != null
+                            && r.Person.LastName.ToLower().Contains(bp))))
+                    .Select(w => w.Id)
+                    .ToListAsync();
+                weddingIds = weddingIds.Union(titleMatchIds).ToList();
+            }
         }
 
         var rawWeddings = await _db.Weddings
