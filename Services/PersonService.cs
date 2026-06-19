@@ -250,6 +250,9 @@ public class PersonService : IPersonService
         };
         _db.People.Add(person);
         await _db.SaveChangesAsync();
+
+        await SyncParentRelationshipsAsync(person.Id, person.Gender, dto.FatherId, dto.MotherId);
+
         return await GetByIdAsync(person.Id);
     }
 
@@ -266,7 +269,58 @@ public class PersonService : IPersonService
         person.FamilyGroup = dto.FamilyGroup?.Trim();
 
         await _db.SaveChangesAsync();
+
+        await SyncParentRelationshipsAsync(id, dto.Gender, dto.FatherId, dto.MotherId);
+
         return await GetByIdAsync(id);
+    }
+
+    private async Task SyncParentRelationshipsAsync(int personId, Gender gender, int? fatherId, int? motherId)
+    {
+        const int FatherTypeId   = 1;
+        const int MotherTypeId   = 2;
+        const int SonTypeId      = 3;
+        const int DaughterTypeId = 4;
+
+        int childTypeId = gender == Gender.Female ? DaughterTypeId : SonTypeId;
+
+        // Convention:
+        //   FATHER/MOTHER (delta +1): FROM=parent, TO=child  — "parent IS THE FATHER/MOTHER OF child"
+        //   SON/DAUGHTER  (delta -1): FROM=child,  TO=parent — "child IS THE SON/DAUGHTER OF parent"
+        //
+        // Remove old parent-child rows for this person before rebuilding.
+        var oldRels = await _db.PersonRelationships
+            .Where(r =>
+                // parent declared this person as their child: FROM=parent, TO=personId, type=FATHER/MOTHER
+                (r.ToPersonId   == personId && (r.RelationshipTypeId == FatherTypeId || r.RelationshipTypeId == MotherTypeId)) ||
+                // this person declared their parent: FROM=personId, TO=parent, type=SON/DAUGHTER
+                (r.FromPersonId == personId && (r.RelationshipTypeId == SonTypeId    || r.RelationshipTypeId == DaughterTypeId)))
+            .ToListAsync();
+        _db.PersonRelationships.RemoveRange(oldRels);
+
+        var newRels = new List<PersonRelationship>();
+
+        if (fatherId.HasValue)
+        {
+            // "father IS THE FATHER OF child": FROM=father, TO=child
+            newRels.Add(new PersonRelationship { FromPersonId = fatherId.Value, ToPersonId = personId,       RelationshipTypeId = FatherTypeId, IsActive = true, CreatedAt = DateTime.UtcNow });
+            // "child IS THE SON/DAUGHTER OF father": FROM=child, TO=father
+            newRels.Add(new PersonRelationship { FromPersonId = personId,       ToPersonId = fatherId.Value, RelationshipTypeId = childTypeId,  IsActive = true, CreatedAt = DateTime.UtcNow });
+        }
+
+        if (motherId.HasValue)
+        {
+            // "mother IS THE MOTHER OF child": FROM=mother, TO=child
+            newRels.Add(new PersonRelationship { FromPersonId = motherId.Value, ToPersonId = personId,       RelationshipTypeId = MotherTypeId, IsActive = true, CreatedAt = DateTime.UtcNow });
+            // "child IS THE SON/DAUGHTER OF mother": FROM=child, TO=mother
+            newRels.Add(new PersonRelationship { FromPersonId = personId,       ToPersonId = motherId.Value, RelationshipTypeId = childTypeId,  IsActive = true, CreatedAt = DateTime.UtcNow });
+        }
+
+        if (newRels.Count > 0)
+        {
+            _db.PersonRelationships.AddRange(newRels);
+            await _db.SaveChangesAsync();
+        }
     }
 
     public async Task DeleteAsync(int id)
@@ -274,13 +328,25 @@ public class PersonService : IPersonService
         var person = await _db.People.FindAsync(id)
             ?? throw new KeyNotFoundException($"Person {id} not found.");
 
-        var isParent = await _db.People.AnyAsync(p => p.FatherId == id || p.MotherId == id);
-        if (isParent)
-            throw new DomainException("Cannot delete a person who is linked as a parent. Remove the parent link first.");
-
         var isInWedding = await _db.WeddingRoles.AnyAsync(r => r.PersonId == id);
         if (isInWedding)
             throw new DomainException("Cannot delete a person who is assigned to a wedding role.");
+
+        // Clear FatherId/MotherId on any children that reference this person
+        var children = await _db.People
+            .Where(p => p.FatherId == id || p.MotherId == id)
+            .ToListAsync();
+        foreach (var child in children)
+        {
+            if (child.FatherId == id) child.FatherId = null;
+            if (child.MotherId == id) child.MotherId = null;
+        }
+
+        // Delete all PersonRelationship rows involving this person
+        var rels = await _db.PersonRelationships
+            .Where(r => r.FromPersonId == id || r.ToPersonId == id)
+            .ToListAsync();
+        _db.PersonRelationships.RemoveRange(rels);
 
         _db.People.Remove(person);
         await _db.SaveChangesAsync();

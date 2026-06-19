@@ -536,6 +536,24 @@ namespace WeddingOrchestrator.Api.Migrations
                             IsActive = true,
                             TypeCode = "GRANDDAUGHTER_IN_LAW",
                             TypeLabel = "Granddaughter-in-law"
+                        },
+                        new
+                        {
+                            Id = 42,
+                            Category = "INLAW",
+                            GenerationDelta = 2,
+                            IsActive = true,
+                            TypeCode = "GRANDFATHER_IN_LAW",
+                            TypeLabel = "Grandfather-in-law"
+                        },
+                        new
+                        {
+                            Id = 43,
+                            Category = "INLAW",
+                            GenerationDelta = 2,
+                            IsActive = true,
+                            TypeCode = "GRANDMOTHER_IN_LAW",
+                            TypeLabel = "Grandmother-in-law"
                         });
                 });
 

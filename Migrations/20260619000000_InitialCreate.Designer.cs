@@ -12,8 +12,8 @@ using WeddingOrchestrator.Api.Data;
 namespace WeddingOrchestrator.Api.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260617000001_AddStepGrandRelationshipTypes")]
-    partial class AddStepGrandRelationshipTypes
+    [Migration("20260619000000_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -171,357 +171,49 @@ namespace WeddingOrchestrator.Api.Migrations
                     b.ToTable("RelationshipTypes");
 
                     b.HasData(
-                        new
-                        {
-                            Id = 1,
-                            Category = "DIRECT",
-                            GenerationDelta = 1,
-                            IsActive = true,
-                            TypeCode = "FATHER",
-                            TypeLabel = "Father"
-                        },
-                        new
-                        {
-                            Id = 2,
-                            Category = "DIRECT",
-                            GenerationDelta = 1,
-                            IsActive = true,
-                            TypeCode = "MOTHER",
-                            TypeLabel = "Mother"
-                        },
-                        new
-                        {
-                            Id = 3,
-                            Category = "DIRECT",
-                            GenerationDelta = -1,
-                            IsActive = true,
-                            TypeCode = "SON",
-                            TypeLabel = "Son"
-                        },
-                        new
-                        {
-                            Id = 4,
-                            Category = "DIRECT",
-                            GenerationDelta = -1,
-                            IsActive = true,
-                            TypeCode = "DAUGHTER",
-                            TypeLabel = "Daughter"
-                        },
-                        new
-                        {
-                            Id = 5,
-                            Category = "DIRECT",
-                            GenerationDelta = 0,
-                            IsActive = true,
-                            TypeCode = "HUSBAND",
-                            TypeLabel = "Husband"
-                        },
-                        new
-                        {
-                            Id = 6,
-                            Category = "DIRECT",
-                            GenerationDelta = 0,
-                            IsActive = true,
-                            TypeCode = "WIFE",
-                            TypeLabel = "Wife"
-                        },
-                        new
-                        {
-                            Id = 7,
-                            Category = "DIRECT",
-                            GenerationDelta = 0,
-                            IsActive = true,
-                            TypeCode = "BROTHER",
-                            TypeLabel = "Brother"
-                        },
-                        new
-                        {
-                            Id = 8,
-                            Category = "DIRECT",
-                            GenerationDelta = 0,
-                            IsActive = true,
-                            TypeCode = "SISTER",
-                            TypeLabel = "Sister"
-                        },
-                        new
-                        {
-                            Id = 9,
-                            Category = "EXTENDED",
-                            GenerationDelta = 2,
-                            IsActive = true,
-                            TypeCode = "GRANDFATHER",
-                            TypeLabel = "Grandfather"
-                        },
-                        new
-                        {
-                            Id = 10,
-                            Category = "EXTENDED",
-                            GenerationDelta = 2,
-                            IsActive = true,
-                            TypeCode = "GRANDMOTHER",
-                            TypeLabel = "Grandmother"
-                        },
-                        new
-                        {
-                            Id = 11,
-                            Category = "EXTENDED",
-                            GenerationDelta = -2,
-                            IsActive = true,
-                            TypeCode = "GRANDSON",
-                            TypeLabel = "Grandson"
-                        },
-                        new
-                        {
-                            Id = 12,
-                            Category = "EXTENDED",
-                            GenerationDelta = -2,
-                            IsActive = true,
-                            TypeCode = "GRANDDAUGHTER",
-                            TypeLabel = "Granddaughter"
-                        },
-                        new
-                        {
-                            Id = 13,
-                            Category = "EXTENDED",
-                            GenerationDelta = 1,
-                            IsActive = true,
-                            TypeCode = "UNCLE",
-                            TypeLabel = "Uncle"
-                        },
-                        new
-                        {
-                            Id = 14,
-                            Category = "EXTENDED",
-                            GenerationDelta = 1,
-                            IsActive = true,
-                            TypeCode = "AUNT",
-                            TypeLabel = "Aunt"
-                        },
-                        new
-                        {
-                            Id = 15,
-                            Category = "EXTENDED",
-                            GenerationDelta = -1,
-                            IsActive = true,
-                            TypeCode = "NEPHEW",
-                            TypeLabel = "Nephew"
-                        },
-                        new
-                        {
-                            Id = 16,
-                            Category = "EXTENDED",
-                            GenerationDelta = -1,
-                            IsActive = true,
-                            TypeCode = "NIECE",
-                            TypeLabel = "Niece"
-                        },
-                        new
-                        {
-                            Id = 17,
-                            Category = "EXTENDED",
-                            GenerationDelta = 0,
-                            IsActive = true,
-                            TypeCode = "COUSIN",
-                            TypeLabel = "Cousin"
-                        },
-                        new
-                        {
-                            Id = 18,
-                            Category = "INLAW",
-                            GenerationDelta = 1,
-                            IsActive = true,
-                            TypeCode = "FATHER_IN_LAW",
-                            TypeLabel = "Father-in-law"
-                        },
-                        new
-                        {
-                            Id = 19,
-                            Category = "INLAW",
-                            GenerationDelta = 1,
-                            IsActive = true,
-                            TypeCode = "MOTHER_IN_LAW",
-                            TypeLabel = "Mother-in-law"
-                        },
-                        new
-                        {
-                            Id = 20,
-                            Category = "INLAW",
-                            GenerationDelta = -1,
-                            IsActive = true,
-                            TypeCode = "SON_IN_LAW",
-                            TypeLabel = "Son-in-law"
-                        },
-                        new
-                        {
-                            Id = 21,
-                            Category = "INLAW",
-                            GenerationDelta = -1,
-                            IsActive = true,
-                            TypeCode = "DAUGHTER_IN_LAW",
-                            TypeLabel = "Daughter-in-law"
-                        },
-                        new
-                        {
-                            Id = 22,
-                            Category = "INLAW",
-                            GenerationDelta = 0,
-                            IsActive = true,
-                            TypeCode = "BROTHER_IN_LAW",
-                            TypeLabel = "Brother-in-law"
-                        },
-                        new
-                        {
-                            Id = 23,
-                            Category = "INLAW",
-                            GenerationDelta = 0,
-                            IsActive = true,
-                            TypeCode = "SISTER_IN_LAW",
-                            TypeLabel = "Sister-in-law"
-                        },
-                        new
-                        {
-                            Id = 24,
-                            Category = "STEP",
-                            GenerationDelta = 1,
-                            IsActive = true,
-                            TypeCode = "STEP_FATHER",
-                            TypeLabel = "Step-father"
-                        },
-                        new
-                        {
-                            Id = 25,
-                            Category = "STEP",
-                            GenerationDelta = 1,
-                            IsActive = true,
-                            TypeCode = "STEP_MOTHER",
-                            TypeLabel = "Step-mother"
-                        },
-                        new
-                        {
-                            Id = 26,
-                            Category = "STEP",
-                            GenerationDelta = -1,
-                            IsActive = true,
-                            TypeCode = "STEP_SON",
-                            TypeLabel = "Step-son"
-                        },
-                        new
-                        {
-                            Id = 27,
-                            Category = "STEP",
-                            GenerationDelta = -1,
-                            IsActive = true,
-                            TypeCode = "STEP_DAUGHTER",
-                            TypeLabel = "Step-daughter"
-                        },
-                        new
-                        {
-                            Id = 28,
-                            Category = "STEP",
-                            GenerationDelta = 0,
-                            IsActive = true,
-                            TypeCode = "STEP_BROTHER",
-                            TypeLabel = "Step-brother"
-                        },
-                        new
-                        {
-                            Id = 29,
-                            Category = "STEP",
-                            GenerationDelta = 0,
-                            IsActive = true,
-                            TypeCode = "STEP_SISTER",
-                            TypeLabel = "Step-sister"
-                        },
-                        new
-                        {
-                            Id = 30,
-                            Category = "ADOPTED",
-                            GenerationDelta = 1,
-                            IsActive = true,
-                            TypeCode = "ADOPTIVE_FATHER",
-                            TypeLabel = "Adoptive Father"
-                        },
-                        new
-                        {
-                            Id = 31,
-                            Category = "ADOPTED",
-                            GenerationDelta = 1,
-                            IsActive = true,
-                            TypeCode = "ADOPTIVE_MOTHER",
-                            TypeLabel = "Adoptive Mother"
-                        },
-                        new
-                        {
-                            Id = 32,
-                            Category = "ADOPTED",
-                            GenerationDelta = -1,
-                            IsActive = true,
-                            TypeCode = "ADOPTED_SON",
-                            TypeLabel = "Adopted Son"
-                        },
-                        new
-                        {
-                            Id = 33,
-                            Category = "ADOPTED",
-                            GenerationDelta = -1,
-                            IsActive = true,
-                            TypeCode = "ADOPTED_DAUGHTER",
-                            TypeLabel = "Adopted Daughter"
-                        },
-                        new
-                        {
-                            Id = 34,
-                            Category = "HALF",
-                            GenerationDelta = 0,
-                            IsActive = true,
-                            TypeCode = "HALF_BROTHER",
-                            TypeLabel = "Half-brother"
-                        },
-                        new
-                        {
-                            Id = 35,
-                            Category = "HALF",
-                            GenerationDelta = 0,
-                            IsActive = true,
-                            TypeCode = "HALF_SISTER",
-                            TypeLabel = "Half-sister"
-                        },
-                        new
-                        {
-                            Id = 36,
-                            Category = "STEP",
-                            GenerationDelta = 2,
-                            IsActive = true,
-                            TypeCode = "STEP_GRANDFATHER",
-                            TypeLabel = "Step-grandfather"
-                        },
-                        new
-                        {
-                            Id = 37,
-                            Category = "STEP",
-                            GenerationDelta = 2,
-                            IsActive = true,
-                            TypeCode = "STEP_GRANDMOTHER",
-                            TypeLabel = "Step-grandmother"
-                        },
-                        new
-                        {
-                            Id = 38,
-                            Category = "STEP",
-                            GenerationDelta = -2,
-                            IsActive = true,
-                            TypeCode = "STEP_GRANDSON",
-                            TypeLabel = "Step-grandson"
-                        },
-                        new
-                        {
-                            Id = 39,
-                            Category = "STEP",
-                            GenerationDelta = -2,
-                            IsActive = true,
-                            TypeCode = "STEP_GRANDDAUGHTER",
-                            TypeLabel = "Step-granddaughter"
-                        });
+                        new { Id = 1,  Category = "DIRECT",   GenerationDelta = 1,  IsActive = true, TypeCode = "FATHER",               TypeLabel = "Father" },
+                        new { Id = 2,  Category = "DIRECT",   GenerationDelta = 1,  IsActive = true, TypeCode = "MOTHER",               TypeLabel = "Mother" },
+                        new { Id = 3,  Category = "DIRECT",   GenerationDelta = -1, IsActive = true, TypeCode = "SON",                  TypeLabel = "Son" },
+                        new { Id = 4,  Category = "DIRECT",   GenerationDelta = -1, IsActive = true, TypeCode = "DAUGHTER",             TypeLabel = "Daughter" },
+                        new { Id = 5,  Category = "DIRECT",   GenerationDelta = 0,  IsActive = true, TypeCode = "HUSBAND",              TypeLabel = "Husband" },
+                        new { Id = 6,  Category = "DIRECT",   GenerationDelta = 0,  IsActive = true, TypeCode = "WIFE",                 TypeLabel = "Wife" },
+                        new { Id = 7,  Category = "DIRECT",   GenerationDelta = 0,  IsActive = true, TypeCode = "BROTHER",              TypeLabel = "Brother" },
+                        new { Id = 8,  Category = "DIRECT",   GenerationDelta = 0,  IsActive = true, TypeCode = "SISTER",               TypeLabel = "Sister" },
+                        new { Id = 9,  Category = "EXTENDED", GenerationDelta = 2,  IsActive = true, TypeCode = "GRANDFATHER",          TypeLabel = "Grandfather" },
+                        new { Id = 10, Category = "EXTENDED", GenerationDelta = 2,  IsActive = true, TypeCode = "GRANDMOTHER",          TypeLabel = "Grandmother" },
+                        new { Id = 11, Category = "EXTENDED", GenerationDelta = -2, IsActive = true, TypeCode = "GRANDSON",             TypeLabel = "Grandson" },
+                        new { Id = 12, Category = "EXTENDED", GenerationDelta = -2, IsActive = true, TypeCode = "GRANDDAUGHTER",        TypeLabel = "Granddaughter" },
+                        new { Id = 13, Category = "EXTENDED", GenerationDelta = 1,  IsActive = true, TypeCode = "UNCLE",                TypeLabel = "Uncle" },
+                        new { Id = 14, Category = "EXTENDED", GenerationDelta = 1,  IsActive = true, TypeCode = "AUNT",                 TypeLabel = "Aunt" },
+                        new { Id = 15, Category = "EXTENDED", GenerationDelta = -1, IsActive = true, TypeCode = "NEPHEW",               TypeLabel = "Nephew" },
+                        new { Id = 16, Category = "EXTENDED", GenerationDelta = -1, IsActive = true, TypeCode = "NIECE",                TypeLabel = "Niece" },
+                        new { Id = 17, Category = "EXTENDED", GenerationDelta = 0,  IsActive = true, TypeCode = "COUSIN",               TypeLabel = "Cousin" },
+                        new { Id = 18, Category = "INLAW",    GenerationDelta = 1,  IsActive = true, TypeCode = "FATHER_IN_LAW",        TypeLabel = "Father-in-law" },
+                        new { Id = 19, Category = "INLAW",    GenerationDelta = 1,  IsActive = true, TypeCode = "MOTHER_IN_LAW",        TypeLabel = "Mother-in-law" },
+                        new { Id = 20, Category = "INLAW",    GenerationDelta = -1, IsActive = true, TypeCode = "SON_IN_LAW",           TypeLabel = "Son-in-law" },
+                        new { Id = 21, Category = "INLAW",    GenerationDelta = -1, IsActive = true, TypeCode = "DAUGHTER_IN_LAW",      TypeLabel = "Daughter-in-law" },
+                        new { Id = 22, Category = "INLAW",    GenerationDelta = 0,  IsActive = true, TypeCode = "BROTHER_IN_LAW",       TypeLabel = "Brother-in-law" },
+                        new { Id = 23, Category = "INLAW",    GenerationDelta = 0,  IsActive = true, TypeCode = "SISTER_IN_LAW",        TypeLabel = "Sister-in-law" },
+                        new { Id = 24, Category = "STEP",     GenerationDelta = 1,  IsActive = true, TypeCode = "STEP_FATHER",          TypeLabel = "Step-father" },
+                        new { Id = 25, Category = "STEP",     GenerationDelta = 1,  IsActive = true, TypeCode = "STEP_MOTHER",          TypeLabel = "Step-mother" },
+                        new { Id = 26, Category = "STEP",     GenerationDelta = -1, IsActive = true, TypeCode = "STEP_SON",             TypeLabel = "Step-son" },
+                        new { Id = 27, Category = "STEP",     GenerationDelta = -1, IsActive = true, TypeCode = "STEP_DAUGHTER",        TypeLabel = "Step-daughter" },
+                        new { Id = 28, Category = "STEP",     GenerationDelta = 0,  IsActive = true, TypeCode = "STEP_BROTHER",         TypeLabel = "Step-brother" },
+                        new { Id = 29, Category = "STEP",     GenerationDelta = 0,  IsActive = true, TypeCode = "STEP_SISTER",          TypeLabel = "Step-sister" },
+                        new { Id = 30, Category = "ADOPTED",  GenerationDelta = 1,  IsActive = true, TypeCode = "ADOPTIVE_FATHER",      TypeLabel = "Adoptive Father" },
+                        new { Id = 31, Category = "ADOPTED",  GenerationDelta = 1,  IsActive = true, TypeCode = "ADOPTIVE_MOTHER",      TypeLabel = "Adoptive Mother" },
+                        new { Id = 32, Category = "ADOPTED",  GenerationDelta = -1, IsActive = true, TypeCode = "ADOPTED_SON",          TypeLabel = "Adopted Son" },
+                        new { Id = 33, Category = "ADOPTED",  GenerationDelta = -1, IsActive = true, TypeCode = "ADOPTED_DAUGHTER",     TypeLabel = "Adopted Daughter" },
+                        new { Id = 34, Category = "HALF",     GenerationDelta = 0,  IsActive = true, TypeCode = "HALF_BROTHER",         TypeLabel = "Half-brother" },
+                        new { Id = 35, Category = "HALF",     GenerationDelta = 0,  IsActive = true, TypeCode = "HALF_SISTER",          TypeLabel = "Half-sister" },
+                        new { Id = 36, Category = "STEP",     GenerationDelta = 2,  IsActive = true, TypeCode = "STEP_GRANDFATHER",     TypeLabel = "Step-grandfather" },
+                        new { Id = 37, Category = "STEP",     GenerationDelta = 2,  IsActive = true, TypeCode = "STEP_GRANDMOTHER",     TypeLabel = "Step-grandmother" },
+                        new { Id = 38, Category = "STEP",     GenerationDelta = -2, IsActive = true, TypeCode = "STEP_GRANDSON",        TypeLabel = "Step-grandson" },
+                        new { Id = 39, Category = "STEP",     GenerationDelta = -2, IsActive = true, TypeCode = "STEP_GRANDDAUGHTER",   TypeLabel = "Step-granddaughter" },
+                        new { Id = 40, Category = "INLAW",    GenerationDelta = -2, IsActive = true, TypeCode = "GRANDSON_IN_LAW",      TypeLabel = "Grandson-in-law" },
+                        new { Id = 41, Category = "INLAW",    GenerationDelta = -2, IsActive = true, TypeCode = "GRANDDAUGHTER_IN_LAW", TypeLabel = "Granddaughter-in-law" },
+                        new { Id = 42, Category = "INLAW",    GenerationDelta = 2,  IsActive = true, TypeCode = "GRANDFATHER_IN_LAW",   TypeLabel = "Grandfather-in-law" },
+                        new { Id = 43, Category = "INLAW",    GenerationDelta = 2,  IsActive = true, TypeCode = "GRANDMOTHER_IN_LAW",   TypeLabel = "Grandmother-in-law" });
                 });
 
             modelBuilder.Entity("WeddingOrchestrator.Api.Models.Song", b =>
@@ -582,54 +274,14 @@ namespace WeddingOrchestrator.Api.Migrations
                     b.ToTable("SongCategories");
 
                     b.HasData(
-                        new
-                        {
-                            Id = 1,
-                            DisplayOrder = 1,
-                            Name = "Groom Songs"
-                        },
-                        new
-                        {
-                            Id = 2,
-                            DisplayOrder = 2,
-                            Name = "Bride Songs"
-                        },
-                        new
-                        {
-                            Id = 3,
-                            DisplayOrder = 3,
-                            Name = "Father Songs"
-                        },
-                        new
-                        {
-                            Id = 4,
-                            DisplayOrder = 4,
-                            Name = "Mother Songs"
-                        },
-                        new
-                        {
-                            Id = 5,
-                            DisplayOrder = 5,
-                            Name = "Grandmother Songs"
-                        },
-                        new
-                        {
-                            Id = 6,
-                            DisplayOrder = 6,
-                            Name = "Grandfather Songs"
-                        },
-                        new
-                        {
-                            Id = 7,
-                            DisplayOrder = 7,
-                            Name = "Intro for Father/Mother"
-                        },
-                        new
-                        {
-                            Id = 8,
-                            DisplayOrder = 8,
-                            Name = "Wedding Intros"
-                        });
+                        new { Id = 1, DisplayOrder = 1, Name = "Groom Songs" },
+                        new { Id = 2, DisplayOrder = 2, Name = "Bride Songs" },
+                        new { Id = 3, DisplayOrder = 3, Name = "Father Songs" },
+                        new { Id = 4, DisplayOrder = 4, Name = "Mother Songs" },
+                        new { Id = 5, DisplayOrder = 5, Name = "Grandmother Songs" },
+                        new { Id = 6, DisplayOrder = 6, Name = "Grandfather Songs" },
+                        new { Id = 7, DisplayOrder = 7, Name = "Intro for Father/Mother" },
+                        new { Id = 8, DisplayOrder = 8, Name = "Wedding Intros" });
                 });
 
             modelBuilder.Entity("WeddingOrchestrator.Api.Models.Wedding", b =>

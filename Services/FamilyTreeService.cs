@@ -3,6 +3,7 @@ using WeddingOrchestrator.Api.Data;
 using WeddingOrchestrator.Api.DTOs.FamilyTree;
 using WeddingOrchestrator.Api.Infrastructure;
 using WeddingOrchestrator.Api.Models;
+using WeddingOrchestrator.Api.Models.Enums;
 using WeddingOrchestrator.Api.Services.Interfaces;
 
 namespace WeddingOrchestrator.Api.Services;
@@ -16,12 +17,10 @@ public class FamilyTreeService : IFamilyTreeService
     {
         var allPeople = await _db.People
             .Select(p => new { p.Id, p.LastName })
-            .Where(p => p.LastName == "Smith")
             .ToListAsync();
 
         var totalPeople = allPeople.Count;
 
-        // Group case-insensitively; display each family name in Pascal Case
         var byLastName = allPeople
             .GroupBy(p => p.LastName.ToLower())
             .Select(g => (
@@ -35,37 +34,70 @@ public class FamilyTreeService : IFamilyTreeService
             .Select(r => new { r.FromPersonId, r.ToPersonId, r.RelationshipTypeId })
             .ToListAsync();
 
-        var spouseTypeIds   = new HashSet<int> { 5, 6 };                         // HUSBAND, WIFE
-        var downwardTypeIds = new HashSet<int> { 3, 4, 20, 21, 26, 27, 32, 33 }; // SON, DAUGHTER, SON_IN_LAW, DAUGHTER_IN_LAW, STEP_SON, STEP_DAUGHTER, ADOPTED_SON, ADOPTED_DAUGHTER
-        var upwardTypeIds   = new HashSet<int> { 1, 2, 24, 25, 30, 31 };          // FATHER, MOTHER, STEP_FATHER, STEP_MOTHER, ADOPTIVE_FATHER, ADOPTIVE_MOTHER
+        var weddingRoles = await _db.WeddingRoles
+            .Where(wr => wr.PersonId != null)
+            .Select(wr => new { wr.WeddingId, wr.RoleType, PersonId = wr.PersonId!.Value })
+            .ToListAsync();
+
+        var spouseTypeIds = new HashSet<int> { 5, 6 };
+        var downwardTypeIds = new HashSet<int> { 3, 4, 20, 21, 26, 27, 32, 33 };
+        var upwardTypeIds   = new HashSet<int> { 1, 2, 24, 25, 30, 31 };
+
+        // For each wedding, map father → grandfather (or father is root when grandfather absent).
+        // Father of Groom → Paternal Grandfather of Groom
+        // Father of Bride → Paternal Grandfather of Bride
+        var fatherToGrandfather = new Dictionary<int, int>();
+        foreach (var wedding in weddingRoles.GroupBy(wr => wr.WeddingId))
+        {
+            var roles = wedding.ToList();
+
+            var fog = roles.FirstOrDefault(r => r.RoleType == RoleType.FatherOfGroom);
+            var gog = roles.FirstOrDefault(r => r.RoleType == RoleType.PaternalGrandfatherOfGroom);
+            if (fog != null && gog != null)
+                fatherToGrandfather[fog.PersonId] = gog.PersonId;
+
+            var fob = roles.FirstOrDefault(r => r.RoleType == RoleType.FatherOfBride);
+            var gob = roles.FirstOrDefault(r => r.RoleType == RoleType.PaternalGrandfatherOfBride);
+            if (fob != null && gob != null)
+                fatherToGrandfather[fob.PersonId] = gob.PersonId;
+        }
+
+        var fatherRoleTypes = new HashSet<RoleType> { RoleType.FatherOfGroom, RoleType.FatherOfBride };
+        var allFatherPersonIds = weddingRoles
+            .Where(wr => fatherRoleTypes.Contains(wr.RoleType))
+            .Select(wr => wr.PersonId)
+            .ToHashSet();
 
         var families = byLastName.Select(family =>
             {
                 var familyIds = family.Ids;
 
-                // Step 1 — find the root generation (grandparents or parents).
-                // A root is any family member that nobody has declared as their child via a
-                // downward relationship type (SON, DAUGHTER, etc.). We intentionally avoid
-                // checking upward types (FATHER, MOTHER) because those can be stored in either
-                // direction depending on how the user entered the data, which caused grandparents
-                // to be incorrectly excluded from roots.
-                var isDeclaredChildByAnyone = allRels
-                    .Where(r => downwardTypeIds.Contains(r.RelationshipTypeId) && familyIds.Contains(r.ToPersonId))
-                    .Select(r => r.ToPersonId)
-                    .ToHashSet();
+                // Roots are anchored to wedding roles:
+                // find fathers from this family, then resolve to grandfather (or father if no grandfather).
+                var rootIds = new HashSet<int>();
+                foreach (var fatherId in allFatherPersonIds.Where(id => familyIds.Contains(id)))
+                {
+                    rootIds.Add(fatherToGrandfather.TryGetValue(fatherId, out var gfId) ? gfId : fatherId);
+                }
 
-                var rootIds = familyIds
-                    .Where(id => !isDeclaredChildByAnyone.Contains(id))
-                    .ToHashSet();
+                // Fallback for families not referenced in any wedding role.
+                // A root has no parent — nobody declared them as a child via FATHER/MOTHER (TO=them),
+                // and they haven't declared a parent via SON/DAUGHTER (FROM=them).
+                if (!rootIds.Any())
+                {
+                    var hasParent = allRels
+                        .Where(r =>
+                            (upwardTypeIds.Contains(r.RelationshipTypeId)   && familyIds.Contains(r.ToPersonId))   ||  // FATHER/MOTHER: TO=child
+                            (downwardTypeIds.Contains(r.RelationshipTypeId) && familyIds.Contains(r.FromPersonId)))    // SON/DAUGHTER:  FROM=child
+                        .Select(r => upwardTypeIds.Contains(r.RelationshipTypeId) ? r.ToPersonId : r.FromPersonId)
+                        .ToHashSet();
 
-                if (!rootIds.Any()) rootIds = new HashSet<int>(familyIds);
+                    rootIds = familyIds.Where(id => !hasParent.Contains(id)).ToHashSet();
+                    if (!rootIds.Any()) rootIds = new HashSet<int>(familyIds);
+                }
 
-                // Step 2 — BFS: traverse only same-family people (those in familyIds).
-                // People outside the family (married-in spouses, children who took a different
-                // last name) are COUNTED but NOT traversed, preventing cross-family inflation.
-                // e.g. Axe BFS finds Kurenai Smith (daughter, non-Axe name) → counts her +
-                // her spouse Saiyan Smith, then stops. Smith BFS finds Kurenai Smith as a
-                // same-name spouse → traverses her and discovers Goku Smith + Chichi Pipi.
+                // BFS from roots: count root + spouse + all descendants + spouses of descendants.
+                // Traverse into same-family nodes; count-but-stop at married-out members.
                 var counted = new HashSet<int>(rootIds);
                 var queue   = new Queue<int>(rootIds);
 
@@ -73,7 +105,7 @@ public class FamilyTreeService : IFamilyTreeService
                 {
                     var pid = queue.Dequeue();
 
-                    // Spouses: count always; traverse only if they share the family's last name
+                    // Spouses: always count, traverse only if same family last name
                     foreach (var sid in allRels
                         .Where(r => spouseTypeIds.Contains(r.RelationshipTypeId) &&
                                    (r.FromPersonId == pid || r.ToPersonId == pid))
@@ -85,14 +117,12 @@ public class FamilyTreeService : IFamilyTreeService
                             queue.Enqueue(sid);
                     }
 
-                    // Children via downward type: FROM=pid says "TO is my son/daughter/…"
                     var childrenA = allRels
-                        .Where(r => downwardTypeIds.Contains(r.RelationshipTypeId) && r.FromPersonId == pid)
+                        .Where(r => upwardTypeIds.Contains(r.RelationshipTypeId) && r.FromPersonId == pid)
                         .Select(r => r.ToPersonId);
 
-                    // Children via upward type: FROM=child says "pid is my father/mother/…"
                     var childrenB = allRels
-                        .Where(r => upwardTypeIds.Contains(r.RelationshipTypeId) && r.ToPersonId == pid)
+                        .Where(r => downwardTypeIds.Contains(r.RelationshipTypeId) && r.ToPersonId == pid)
                         .Select(r => r.FromPersonId);
 
                     foreach (var cid in childrenA.Concat(childrenB).Distinct().Where(id => !counted.Contains(id)))
@@ -104,8 +134,7 @@ public class FamilyTreeService : IFamilyTreeService
                         }
                         else
                         {
-                            // Child who took a different last name (married out): count but stop
-                            // traversing; still pull in their spouse since we stop here
+                            // Married-out child: count their spouse but don't traverse further
                             foreach (var gsid in allRels
                                 .Where(r => spouseTypeIds.Contains(r.RelationshipTypeId) &&
                                            (r.FromPersonId == cid || r.ToPersonId == cid))

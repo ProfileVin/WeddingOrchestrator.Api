@@ -225,7 +225,8 @@ public class WeddingService : IWeddingService
         // Build the complete expected set of sync-managed relationships for this wedding.
         // Type IDs: 1=FATHER,2=MOTHER,3=SON,4=DAUGHTER,5=HUSBAND,6=WIFE,
         //           9=GRANDFATHER,10=GRANDMOTHER,11=GRANDSON,12=GRANDDAUGHTER,
-        //           18=FATHER_IN_LAW,19=MOTHER_IN_LAW,20=SON_IN_LAW,21=DAUGHTER_IN_LAW
+        //           18=FATHER_IN_LAW,19=MOTHER_IN_LAW,20=SON_IN_LAW,21=DAUGHTER_IN_LAW,
+        //           40=GRANDSON_IN_LAW,41=GRANDDAUGHTER_IN_LAW,42=GRANDFATHER_IN_LAW,43=GRANDMOTHER_IN_LAW
         var expected = new HashSet<(int From, int To, int Type)>();
 
         var parentChildPairs = new (RoleType child, RoleType parent, int childTypeId, int parentTypeId)[]
@@ -279,6 +280,7 @@ public class WeddingService : IWeddingService
             expected.Add((wId, hId, 6)); // WIFE
         }
 
+        // Groom/Bride ↔ parents-in-law (one generation up)
         var inLawPairs = new (RoleType person, RoleType inLaw, int personTypeId, int inLawTypeId)[]
         {
             (RoleType.Groom, RoleType.FatherOfBride, 20, 18),
@@ -294,8 +296,57 @@ public class WeddingService : IWeddingService
             expected.Add((inLawId, personId, inLawTypeId));
         }
 
+        // Parents ↔ grandparents-in-law: the parent who married INTO the family becomes
+        // son/daughter-in-law of their spouse's parents (the grandparents).
+        // e.g. MotherOfGroom married FatherOfGroom → she is daughter-in-law of paternal grandparents of Groom.
+        var parentGrandparentInLawPairs = new (RoleType parent, RoleType grandparent, int parentTypeId, int grandparentTypeId)[]
+        {
+            // Groom's mother is daughter-in-law of Groom's paternal grandparents
+            (RoleType.MotherOfGroom, RoleType.PaternalGrandfatherOfGroom, 21, 18),
+            (RoleType.MotherOfGroom, RoleType.PaternalGrandmotherOfGroom, 21, 19),
+            // Groom's father is son-in-law of Groom's maternal grandparents
+            (RoleType.FatherOfGroom, RoleType.MaternalGrandfatherOfGroom, 20, 18),
+            (RoleType.FatherOfGroom, RoleType.MaternalGrandmotherOfGroom, 20, 19),
+            // Bride's mother is daughter-in-law of Bride's paternal grandparents
+            (RoleType.MotherOfBride, RoleType.PaternalGrandfatherOfBride, 21, 18),
+            (RoleType.MotherOfBride, RoleType.PaternalGrandmotherOfBride, 21, 19),
+            // Bride's father is son-in-law of Bride's maternal grandparents
+            (RoleType.FatherOfBride, RoleType.MaternalGrandfatherOfBride, 20, 18),
+            (RoleType.FatherOfBride, RoleType.MaternalGrandmotherOfBride, 20, 19),
+        };
+
+        foreach (var (parentRole, grandparentRole, parentTypeId, grandparentTypeId) in parentGrandparentInLawPairs)
+        {
+            if (!roles.TryGetValue(parentRole, out var parentId) || !roles.TryGetValue(grandparentRole, out var grandparentId)) continue;
+            expected.Add((parentId, grandparentId, parentTypeId));
+            expected.Add((grandparentId, parentId, grandparentTypeId));
+        }
+
+        // Groom/Bride ↔ grandparents-in-law (two generations up on the other side).
+        // 40=GRANDSON_IN_LAW, 41=GRANDDAUGHTER_IN_LAW, 42=GRANDFATHER_IN_LAW, 43=GRANDMOTHER_IN_LAW
+        var grandchildInLawPairs = new (RoleType grandchild, RoleType grandparent, int grandchildTypeId, int grandparentTypeId)[]
+        {
+            // Bride is granddaughter-in-law of all four of Groom's grandparents
+            (RoleType.Bride, RoleType.PaternalGrandfatherOfGroom, 41, 42),
+            (RoleType.Bride, RoleType.PaternalGrandmotherOfGroom, 41, 43),
+            (RoleType.Bride, RoleType.MaternalGrandfatherOfGroom, 41, 42),
+            (RoleType.Bride, RoleType.MaternalGrandmotherOfGroom, 41, 43),
+            // Groom is grandson-in-law of all four of Bride's grandparents
+            (RoleType.Groom, RoleType.PaternalGrandfatherOfBride, 40, 42),
+            (RoleType.Groom, RoleType.PaternalGrandmotherOfBride, 40, 43),
+            (RoleType.Groom, RoleType.MaternalGrandfatherOfBride, 40, 42),
+            (RoleType.Groom, RoleType.MaternalGrandmotherOfBride, 40, 43),
+        };
+
+        foreach (var (grandchildRole, grandparentRole, grandchildTypeId, grandparentTypeId) in grandchildInLawPairs)
+        {
+            if (!roles.TryGetValue(grandchildRole, out var grandchildId) || !roles.TryGetValue(grandparentRole, out var grandparentId)) continue;
+            expected.Add((grandchildId, grandparentId, grandchildTypeId));
+            expected.Add((grandparentId, grandchildId, grandparentTypeId));
+        }
+
         // Load all existing sync-managed relationships for everyone involved
-        var syncTypeIds = new HashSet<int> { 1, 2, 3, 4, 5, 6, 9, 10, 11, 12, 18, 19, 20, 21 };
+        var syncTypeIds = new HashSet<int> { 1, 2, 3, 4, 5, 6, 9, 10, 11, 12, 18, 19, 20, 21, 40, 41, 42, 43 };
         var allAffectedIds = roles.Values.ToHashSet();
         if (previousPersonIds != null) allAffectedIds.UnionWith(previousPersonIds);
 

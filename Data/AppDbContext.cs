@@ -153,8 +153,16 @@ public class AppDbContext : DbContext
             new RelationshipType { Id = 31, TypeCode = "ADOPTIVE_MOTHER",  TypeLabel = "Adoptive Mother",  Category = "ADOPTED",  GenerationDelta =  1 },
             new RelationshipType { Id = 32, TypeCode = "ADOPTED_SON",      TypeLabel = "Adopted Son",      Category = "ADOPTED",  GenerationDelta = -1 },
             new RelationshipType { Id = 33, TypeCode = "ADOPTED_DAUGHTER", TypeLabel = "Adopted Daughter", Category = "ADOPTED",  GenerationDelta = -1 },
-            new RelationshipType { Id = 34, TypeCode = "HALF_BROTHER",     TypeLabel = "Half-brother",     Category = "HALF",     GenerationDelta =  0 },
-            new RelationshipType { Id = 35, TypeCode = "HALF_SISTER",      TypeLabel = "Half-sister",      Category = "HALF",     GenerationDelta =  0 }
+            new RelationshipType { Id = 34, TypeCode = "HALF_BROTHER",          TypeLabel = "Half-brother",          Category = "HALF",  GenerationDelta =  0 },
+            new RelationshipType { Id = 35, TypeCode = "HALF_SISTER",           TypeLabel = "Half-sister",           Category = "HALF",  GenerationDelta =  0 },
+            new RelationshipType { Id = 36, TypeCode = "STEP_GRANDFATHER",      TypeLabel = "Step-grandfather",      Category = "STEP",  GenerationDelta =  2 },
+            new RelationshipType { Id = 37, TypeCode = "STEP_GRANDMOTHER",      TypeLabel = "Step-grandmother",      Category = "STEP",  GenerationDelta =  2 },
+            new RelationshipType { Id = 38, TypeCode = "STEP_GRANDSON",         TypeLabel = "Step-grandson",         Category = "STEP",  GenerationDelta = -2 },
+            new RelationshipType { Id = 39, TypeCode = "STEP_GRANDDAUGHTER",    TypeLabel = "Step-granddaughter",    Category = "STEP",  GenerationDelta = -2 },
+            new RelationshipType { Id = 40, TypeCode = "GRANDSON_IN_LAW",       TypeLabel = "Grandson-in-law",       Category = "INLAW", GenerationDelta = -2 },
+            new RelationshipType { Id = 41, TypeCode = "GRANDDAUGHTER_IN_LAW",  TypeLabel = "Granddaughter-in-law",  Category = "INLAW", GenerationDelta = -2 },
+            new RelationshipType { Id = 42, TypeCode = "GRANDFATHER_IN_LAW",    TypeLabel = "Grandfather-in-law",    Category = "INLAW", GenerationDelta =  2 },
+            new RelationshipType { Id = 43, TypeCode = "GRANDMOTHER_IN_LAW",    TypeLabel = "Grandmother-in-law",    Category = "INLAW", GenerationDelta =  2 }
         );
 
         // ── Seed: SongCategories ───────────────────────────────────────────
