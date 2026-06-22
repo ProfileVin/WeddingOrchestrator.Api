@@ -164,6 +164,7 @@ public class WeddingService : IWeddingService
         wedding.UpdatedDate = DateTime.Now;
         await _db.SaveChangesAsync();
         await SyncFamilyLinksAsync(id);
+        await SyncPersonRelationshipsAsync(id);
         return await GetByIdAsync(id);
     }
 
@@ -203,6 +204,76 @@ public class WeddingService : IWeddingService
         }
 
         if (changed) await _db.SaveChangesAsync();
+    }
+
+    private async Task SyncPersonRelationshipsAsync(int weddingId)
+    {
+        var roles = await _db.WeddingRoles
+            .Where(r => r.WeddingId == weddingId && r.PersonId.HasValue)
+            .ToDictionaryAsync(r => r.RoleType, r => r.PersonId!.Value);
+
+        // (childRole, parentRole, childTypeId, parentTypeId)
+        // Type IDs match RelationshipTypes seed: 1=FATHER,2=MOTHER,3=SON,4=DAUGHTER,
+        // 5=HUSBAND,6=WIFE,18=FATHER_IN_LAW,19=MOTHER_IN_LAW,20=SON_IN_LAW,21=DAUGHTER_IN_LAW
+        var parentChildPairs = new (RoleType child, RoleType parent, int childTypeId, int parentTypeId)[]
+        {
+            (RoleType.Groom,         RoleType.FatherOfGroom,             3, 1),
+            (RoleType.Groom,         RoleType.MotherOfGroom,             3, 2),
+            (RoleType.Bride,         RoleType.FatherOfBride,             4, 1),
+            (RoleType.Bride,         RoleType.MotherOfBride,             4, 2),
+            (RoleType.FatherOfGroom, RoleType.PaternalGrandfatherOfGroom, 3, 1),
+            (RoleType.FatherOfGroom, RoleType.PaternalGrandmotherOfGroom, 3, 2),
+            (RoleType.MotherOfGroom, RoleType.MaternalGrandfatherOfGroom, 4, 1),
+            (RoleType.MotherOfGroom, RoleType.MaternalGrandmotherOfGroom, 4, 2),
+            (RoleType.FatherOfBride, RoleType.PaternalGrandfatherOfBride, 3, 1),
+            (RoleType.FatherOfBride, RoleType.PaternalGrandmotherOfBride, 3, 2),
+            (RoleType.MotherOfBride, RoleType.MaternalGrandfatherOfBride, 4, 1),
+            (RoleType.MotherOfBride, RoleType.MaternalGrandmotherOfBride, 4, 2),
+        };
+
+        foreach (var (childRole, parentRole, childTypeId, parentTypeId) in parentChildPairs)
+        {
+            if (!roles.TryGetValue(childRole, out var childId) || !roles.TryGetValue(parentRole, out var parentId)) continue;
+            await TryAddRelAsync(childId, parentId, childTypeId);
+            await TryAddRelAsync(parentId, childId, parentTypeId);
+        }
+
+        // Spouse
+        if (roles.TryGetValue(RoleType.Groom, out var groomId) && roles.TryGetValue(RoleType.Bride, out var brideId))
+        {
+            await TryAddRelAsync(groomId, brideId, 5); // HUSBAND
+            await TryAddRelAsync(brideId, groomId, 6); // WIFE
+        }
+
+        // In-laws
+        var inLawPairs = new (RoleType person, RoleType inLaw, int personTypeId, int inLawTypeId)[]
+        {
+            (RoleType.Groom, RoleType.FatherOfBride, 20, 18),
+            (RoleType.Groom, RoleType.MotherOfBride, 20, 19),
+            (RoleType.Bride, RoleType.FatherOfGroom, 21, 18),
+            (RoleType.Bride, RoleType.MotherOfGroom, 21, 19),
+        };
+
+        foreach (var (person, inLaw, personTypeId, inLawTypeId) in inLawPairs)
+        {
+            if (!roles.TryGetValue(person, out var personId) || !roles.TryGetValue(inLaw, out var inLawId)) continue;
+            await TryAddRelAsync(personId, inLawId, personTypeId);
+            await TryAddRelAsync(inLawId, personId, inLawTypeId);
+        }
+    }
+
+    private async Task TryAddRelAsync(int fromId, int toId, int typeId)
+    {
+        if (fromId == toId) return;
+        var exists = await _db.PersonRelationships.AnyAsync(r =>
+            r.FromPersonId == fromId && r.ToPersonId == toId && r.RelationshipTypeId == typeId);
+        if (!exists)
+            _db.PersonRelationships.Add(new PersonRelationship
+            {
+                FromPersonId = fromId, ToPersonId = toId,
+                RelationshipTypeId = typeId, IsActive = true, CreatedAt = DateTime.UtcNow
+            });
+        await _db.SaveChangesAsync();
     }
 
     public async Task<WeddingDto> AssignSongsAsync(int id, AssignSongsDto dto)
