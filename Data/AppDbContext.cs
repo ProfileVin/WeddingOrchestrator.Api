@@ -14,6 +14,7 @@ public class AppDbContext : DbContext
     public DbSet<Wedding> Weddings => Set<Wedding>();
     public DbSet<WeddingRole> WeddingRoles => Set<WeddingRole>();
     public DbSet<WeddingRoleSongAssignment> WeddingRoleSongAssignments => Set<WeddingRoleSongAssignment>();
+    public DbSet<PersonNote> PersonNotes => Set<PersonNote>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -35,6 +36,7 @@ public class AppDbContext : DbContext
             e.Property(p => p.FirstName).HasMaxLength(100).IsRequired();
             e.Property(p => p.LastName).HasMaxLength(100).IsRequired();
             e.Property(p => p.Gender).HasConversion<int>();
+            e.Property(p => p.FamilyGroup).HasMaxLength(200);
             e.Ignore(p => p.FullName);
             e.HasIndex(p => new { p.FirstName, p.LastName }).IsUnique();
         });
@@ -62,6 +64,22 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<WeddingRole>(e =>
         {
             e.HasIndex(r => new { r.WeddingId, r.RoleType }).IsUnique();
+        });
+
+        // ── PersonNote ─────────────────────────────────────────────────────
+        modelBuilder.Entity<PersonNote>(e =>
+        {
+            e.Property(n => n.Content).HasMaxLength(2000).IsRequired();
+
+            e.HasOne(n => n.Person)
+             .WithMany()
+             .HasForeignKey(n => n.PersonId)
+             .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasOne(n => n.Wedding)
+             .WithMany()
+             .HasForeignKey(n => n.WeddingId)
+             .OnDelete(DeleteBehavior.SetNull);
         });
 
         // ── WeddingRoleSongAssignment ──────────────────────────────────────

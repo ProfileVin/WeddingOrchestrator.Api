@@ -12,8 +12,10 @@ public class PersonWeddingDto
     public int WeddingId { get; set; }
     public string Title { get; set; } = string.Empty;
     public string Date { get; set; } = string.Empty;
+    public string? Location { get; set; }
     public string Role { get; set; } = string.Empty;
     public bool IsFinalized { get; set; }
+    public string? SongTitle { get; set; }
 }
 
 public class PersonProfileDto
@@ -34,4 +36,5 @@ public class PersonProfileDto
     public PersonSummaryDto? MaternalGrandmother { get; set; }
 
     public List<PersonWeddingDto> Weddings { get; set; } = new();
+    public List<PersonNoteDto> Notes { get; set; } = new();
 }

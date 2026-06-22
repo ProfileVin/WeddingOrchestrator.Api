@@ -14,4 +14,7 @@ public class UpdatePersonDto
     public Gender Gender { get; set; }
     public int? FatherId { get; set; }
     public int? MotherId { get; set; }
+
+    [MaxLength(200)]
+    public string? FamilyGroup { get; set; }
 }
