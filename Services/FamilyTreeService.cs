@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using WeddingOrchestrator.Api.Data;
 using WeddingOrchestrator.Api.DTOs.FamilyTree;
+using WeddingOrchestrator.Api.DTOs.People;
 using WeddingOrchestrator.Api.Infrastructure;
 using WeddingOrchestrator.Api.Models;
 using WeddingOrchestrator.Api.Models.Enums;
@@ -11,7 +12,13 @@ namespace WeddingOrchestrator.Api.Services;
 public class FamilyTreeService : IFamilyTreeService
 {
     private readonly AppDbContext _db;
-    public FamilyTreeService(AppDbContext db) => _db = db;
+    private readonly IPersonService _personService;
+
+    public FamilyTreeService(AppDbContext db, IPersonService personService)
+    {
+        _db = db;
+        _personService = personService;
+    }
 
     public async Task<FamilySummariesResponseDto> GetFamilySummariesAsync()
     {
@@ -358,5 +365,230 @@ public class FamilyTreeService : IFamilyTreeService
             ?? throw new KeyNotFoundException($"Relationship {id} not found.");
         _db.PersonRelationships.Remove(rel);
         await _db.SaveChangesAsync();
+    }
+
+    private static readonly HashSet<string> AllowedRoleCodes = new()
+    {
+        "FATHER", "MOTHER", "BROTHER", "SISTER",
+        "STEP_FATHER", "STEP_MOTHER", "STEP_BROTHER", "STEP_SISTER",
+    };
+
+    private static Gender GenderFromRoleCode(string roleCode) => roleCode switch
+    {
+        "FATHER" or "BROTHER" or "STEP_FATHER" or "STEP_BROTHER" => Gender.Male,
+        _ => Gender.Female,
+    };
+
+    public async Task<PersonDto> AddFamilyMemberAsync(AddFamilyMemberDto dto)
+    {
+        if (!AllowedRoleCodes.Contains(dto.RoleCode))
+            throw new DomainException($"Invalid roleCode '{dto.RoleCode}'.");
+
+        if (dto.FatherId.HasValue && !await _db.People.AnyAsync(p => p.Id == dto.FatherId.Value))
+            throw new KeyNotFoundException($"Father person {dto.FatherId} not found.");
+        if (dto.MotherId.HasValue && !await _db.People.AnyAsync(p => p.Id == dto.MotherId.Value))
+            throw new KeyNotFoundException($"Mother person {dto.MotherId} not found.");
+
+        var newPerson = await _personService.CreateAsync(new CreatePersonDto
+        {
+            FirstName = dto.FirstName,
+            LastName  = dto.LastName,
+            Gender    = GenderFromRoleCode(dto.RoleCode),
+        });
+
+        var existingChildren = await GetChildrenOfParentsAsync(dto.FatherId, dto.MotherId);
+
+        var neededCodes = GetNeededTypeCodes(dto.RoleCode, existingChildren);
+        var typeIdByCode = await _db.RelationshipTypes
+            .Where(rt => neededCodes.Contains(rt.TypeCode) && rt.IsActive)
+            .ToDictionaryAsync(rt => rt.TypeCode, rt => rt.Id);
+
+        var relsToCreate = BuildFamilyRelationships(
+            newPerson.Id, dto.RoleCode, dto.FatherId, dto.MotherId, existingChildren, typeIdByCode);
+
+        if (relsToCreate.Count > 0)
+        {
+            var existingSet = await _db.PersonRelationships
+                .Where(r => relsToCreate.Select(x => x.FromPersonId).Contains(r.FromPersonId))
+                .Select(r => new { r.FromPersonId, r.ToPersonId, r.RelationshipTypeId })
+                .ToListAsync();
+            var existingKeys = existingSet
+                .Select(r => (r.FromPersonId, r.ToPersonId, r.RelationshipTypeId))
+                .ToHashSet();
+
+            var deduped = relsToCreate
+                .Where(r => !existingKeys.Contains((r.FromPersonId, r.ToPersonId, r.RelationshipTypeId)))
+                .ToList();
+
+            if (deduped.Count > 0)
+            {
+                _db.PersonRelationships.AddRange(deduped);
+                await _db.SaveChangesAsync();
+            }
+        }
+
+        return newPerson;
+    }
+
+    private async Task<List<(int Id, Gender Gender)>> GetChildrenOfParentsAsync(int? fatherId, int? motherId)
+    {
+        if (fatherId == null && motherId == null)
+            return new List<(int, Gender)>();
+
+        var parentIds = new List<int>();
+        if (fatherId.HasValue) parentIds.Add(fatherId.Value);
+        if (motherId.HasValue) parentIds.Add(motherId.Value);
+
+        // FATHER/MOTHER: FROM=parent, TO=child
+        var childIdsA = await _db.PersonRelationships
+            .Where(r => r.IsActive && (r.RelationshipTypeId == 1 || r.RelationshipTypeId == 2)
+                     && parentIds.Contains(r.FromPersonId))
+            .Select(r => r.ToPersonId)
+            .ToListAsync();
+
+        // SON/DAUGHTER: FROM=child, TO=parent
+        var childIdsB = await _db.PersonRelationships
+            .Where(r => r.IsActive && (r.RelationshipTypeId == 3 || r.RelationshipTypeId == 4)
+                     && parentIds.Contains(r.ToPersonId))
+            .Select(r => r.FromPersonId)
+            .ToListAsync();
+
+        var allChildIds = childIdsA.Concat(childIdsB).Distinct().ToList();
+        if (allChildIds.Count == 0)
+            return new List<(int, Gender)>();
+
+        var children = await _db.People
+            .Where(p => allChildIds.Contains(p.Id))
+            .Select(p => new { p.Id, p.Gender })
+            .ToListAsync();
+
+        return children.Select(c => (c.Id, c.Gender)).ToList();
+    }
+
+    private static HashSet<string> GetNeededTypeCodes(string roleCode, List<(int Id, Gender Gender)> existingChildren)
+    {
+        var codes = new HashSet<string>();
+        switch (roleCode)
+        {
+            case "FATHER":
+                if (existingChildren.Count > 0) codes.Add("FATHER");
+                codes.Add("HUSBAND");
+                break;
+            case "MOTHER":
+                if (existingChildren.Count > 0) codes.Add("MOTHER");
+                codes.Add("WIFE");
+                break;
+            case "BROTHER":
+                codes.Add("SON"); codes.Add("BROTHER"); codes.Add("SISTER");
+                break;
+            case "SISTER":
+                codes.Add("DAUGHTER"); codes.Add("SISTER"); codes.Add("BROTHER");
+                break;
+            case "STEP_FATHER":
+                codes.Add("STEP_FATHER");
+                break;
+            case "STEP_MOTHER":
+                codes.Add("STEP_MOTHER");
+                break;
+            case "STEP_BROTHER":
+                codes.Add("STEP_BROTHER"); codes.Add("STEP_SISTER");
+                break;
+            case "STEP_SISTER":
+                codes.Add("STEP_SISTER"); codes.Add("STEP_BROTHER");
+                break;
+        }
+        return codes;
+    }
+
+    private static List<PersonRelationship> BuildFamilyRelationships(
+        int newPersonId,
+        string roleCode,
+        int? fatherId,
+        int? motherId,
+        List<(int Id, Gender Gender)> existingChildren,
+        Dictionary<string, int> typeIdByCode)
+    {
+        var result = new List<PersonRelationship>();
+        var parents = new List<int>();
+        if (fatherId.HasValue) parents.Add(fatherId.Value);
+        if (motherId.HasValue) parents.Add(motherId.Value);
+
+        void Add(int fromId, int toId, string typeCode)
+        {
+            if (typeIdByCode.TryGetValue(typeCode, out var typeId))
+                result.Add(new PersonRelationship
+                {
+                    FromPersonId = fromId,
+                    ToPersonId = toId,
+                    RelationshipTypeId = typeId,
+                    IsActive = true,
+                    CreatedAt = DateTime.UtcNow,
+                });
+        }
+
+        switch (roleCode)
+        {
+            case "FATHER":
+                foreach (var child in existingChildren)
+                    Add(newPersonId, child.Id, "FATHER");
+                if (motherId.HasValue)
+                    Add(newPersonId, motherId.Value, "HUSBAND");
+                break;
+
+            case "MOTHER":
+                foreach (var child in existingChildren)
+                    Add(newPersonId, child.Id, "MOTHER");
+                if (fatherId.HasValue)
+                    Add(newPersonId, fatherId.Value, "WIFE");
+                break;
+
+            case "BROTHER":
+                foreach (var parentId in parents)
+                    Add(newPersonId, parentId, "SON");
+                foreach (var child in existingChildren)
+                {
+                    Add(newPersonId, child.Id, "BROTHER");
+                    Add(child.Id, newPersonId, child.Gender == Gender.Female ? "SISTER" : "BROTHER");
+                }
+                break;
+
+            case "SISTER":
+                foreach (var parentId in parents)
+                    Add(newPersonId, parentId, "DAUGHTER");
+                foreach (var child in existingChildren)
+                {
+                    Add(newPersonId, child.Id, "SISTER");
+                    Add(child.Id, newPersonId, child.Gender == Gender.Female ? "SISTER" : "BROTHER");
+                }
+                break;
+
+            case "STEP_FATHER":
+                foreach (var child in existingChildren)
+                    Add(newPersonId, child.Id, "STEP_FATHER");
+                break;
+
+            case "STEP_MOTHER":
+                foreach (var child in existingChildren)
+                    Add(newPersonId, child.Id, "STEP_MOTHER");
+                break;
+
+            case "STEP_BROTHER":
+                foreach (var child in existingChildren)
+                {
+                    Add(newPersonId, child.Id, "STEP_BROTHER");
+                    Add(child.Id, newPersonId, child.Gender == Gender.Female ? "STEP_SISTER" : "STEP_BROTHER");
+                }
+                break;
+
+            case "STEP_SISTER":
+                foreach (var child in existingChildren)
+                {
+                    Add(newPersonId, child.Id, "STEP_SISTER");
+                    Add(child.Id, newPersonId, child.Gender == Gender.Female ? "STEP_SISTER" : "STEP_BROTHER");
+                }
+                break;
+        }
+
+        return result;
     }
 }

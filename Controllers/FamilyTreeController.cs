@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using WeddingOrchestrator.Api.DTOs.FamilyTree;
+using WeddingOrchestrator.Api.DTOs.People;
 using WeddingOrchestrator.Api.Services.Interfaces;
 
 namespace WeddingOrchestrator.Api.Controllers;
@@ -37,4 +38,8 @@ public class FamilyTreeController : ControllerBase
         await _service.DeleteRelationshipAsync(id);
         return NoContent();
     }
+
+    [HttpPost("add-member")]
+    public async Task<ActionResult<PersonDto>> AddFamilyMember([FromBody] AddFamilyMemberDto dto)
+        => Ok(await _service.AddFamilyMemberAsync(dto));
 }
