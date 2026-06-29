@@ -12,11 +12,10 @@ public class AppDbContext : DbContext
     public DbSet<Song> Songs => Set<Song>();
     public DbSet<Person> People => Set<Person>();
     public DbSet<Wedding> Weddings => Set<Wedding>();
-    public DbSet<WeddingRole> WeddingRoles => Set<WeddingRole>();
-    public DbSet<WeddingRoleSongAssignment> WeddingRoleSongAssignments => Set<WeddingRoleSongAssignment>();
-    public DbSet<PersonNote> PersonNotes => Set<PersonNote>();
     public DbSet<RelationshipType> RelationshipTypes => Set<RelationshipType>();
     public DbSet<PersonRelationship> PersonRelationships => Set<PersonRelationship>();
+    public DbSet<RoleTypeDefinition> RoleTypes => Set<RoleTypeDefinition>();
+    public DbSet<WeddingDetail> WeddingDetails => Set<WeddingDetail>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -60,44 +59,6 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<Wedding>(e =>
         {
             e.Property(w => w.Location).HasMaxLength(300);
-        });
-
-        // ── WeddingRole ────────────────────────────────────────────────────
-        modelBuilder.Entity<WeddingRole>(e =>
-        {
-            e.HasIndex(r => new { r.WeddingId, r.RoleType }).IsUnique();
-        });
-
-        // ── PersonNote ─────────────────────────────────────────────────────
-        modelBuilder.Entity<PersonNote>(e =>
-        {
-            e.Property(n => n.Content).HasMaxLength(2000).IsRequired();
-
-            e.HasOne(n => n.Person)
-             .WithMany()
-             .HasForeignKey(n => n.PersonId)
-             .OnDelete(DeleteBehavior.Cascade);
-
-            e.HasOne(n => n.Wedding)
-             .WithMany()
-             .HasForeignKey(n => n.WeddingId)
-             .OnDelete(DeleteBehavior.SetNull);
-        });
-
-        // ── WeddingRoleSongAssignment ──────────────────────────────────────
-        modelBuilder.Entity<WeddingRoleSongAssignment>(e =>
-        {
-            e.HasIndex(a => new { a.WeddingRoleId, a.AssignmentSlot }).IsUnique();
-
-            e.HasOne(a => a.WeddingRole)
-             .WithMany(r => r.SongAssignments)
-             .HasForeignKey(a => a.WeddingRoleId)
-             .OnDelete(DeleteBehavior.Cascade);
-
-            e.HasOne(a => a.Song)
-             .WithMany(s => s.Assignments)
-             .HasForeignKey(a => a.SongId)
-             .OnDelete(DeleteBehavior.Restrict);
         });
 
         // ── RelationshipType ───────────────────────────────────────────────
@@ -163,6 +124,62 @@ public class AppDbContext : DbContext
             new RelationshipType { Id = 41, TypeCode = "GRANDDAUGHTER_IN_LAW",  TypeLabel = "Granddaughter-in-law",  Category = "INLAW", GenerationDelta = -2 },
             new RelationshipType { Id = 42, TypeCode = "GRANDFATHER_IN_LAW",    TypeLabel = "Grandfather-in-law",    Category = "INLAW", GenerationDelta =  2 },
             new RelationshipType { Id = 43, TypeCode = "GRANDMOTHER_IN_LAW",    TypeLabel = "Grandmother-in-law",    Category = "INLAW", GenerationDelta =  2 }
+        );
+
+        // ── WeddingDetail ──────────────────────────────────────────────────
+        modelBuilder.Entity<WeddingDetail>(e =>
+        {
+            e.Property(d => d.RoleType).HasConversion<int>();
+            e.Property(d => d.Note).HasMaxLength(2000);
+
+            e.HasOne(d => d.Wedding)
+             .WithMany(w => w.Details)
+             .HasForeignKey(d => d.WeddingId)
+             .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasOne(d => d.Person)
+             .WithMany(p => p.WeddingDetails)
+             .HasForeignKey(d => d.PersonId)
+             .OnDelete(DeleteBehavior.Restrict);
+
+            e.HasOne(d => d.Song)
+             .WithMany()
+             .HasForeignKey(d => d.SongId)
+             .OnDelete(DeleteBehavior.Restrict);
+
+            e.HasOne(d => d.WeddingRelationType)
+             .WithMany()
+             .HasForeignKey(d => d.InWeddingRelationTypeId)
+             .OnDelete(DeleteBehavior.Restrict);
+
+            e.HasOne(d => d.RelatedToPerson)
+             .WithMany()
+             .HasForeignKey(d => d.RelatedToPersonId)
+             .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // ── RoleTypeDefinition ─────────────────────────────────────────────
+        modelBuilder.Entity<RoleTypeDefinition>(e =>
+        {
+            e.ToTable("RoleTypes");
+            e.Property(r => r.Name).HasMaxLength(200).IsRequired();
+        });
+
+        modelBuilder.Entity<RoleTypeDefinition>().HasData(
+            new RoleTypeDefinition { Id = 1,  Name = "Groom" },
+            new RoleTypeDefinition { Id = 2,  Name = "Bride" },
+            new RoleTypeDefinition { Id = 3,  Name = "Father of the Groom" },
+            new RoleTypeDefinition { Id = 4,  Name = "Mother of the Groom" },
+            new RoleTypeDefinition { Id = 9,  Name = "Father of the Bride" },
+            new RoleTypeDefinition { Id = 10, Name = "Mother of the Bride" },
+            new RoleTypeDefinition { Id = 5,  Name = "Paternal Grandfather of the Groom" },
+            new RoleTypeDefinition { Id = 6,  Name = "Paternal Grandmother of the Groom" },
+            new RoleTypeDefinition { Id = 7,  Name = "Maternal Grandfather of the Groom" },
+            new RoleTypeDefinition { Id = 8,  Name = "Maternal Grandmother of the Groom" },
+            new RoleTypeDefinition { Id = 11, Name = "Paternal Grandfather of the Bride" },
+            new RoleTypeDefinition { Id = 12, Name = "Paternal Grandmother of the Bride" },
+            new RoleTypeDefinition { Id = 13, Name = "Maternal Grandfather of the Bride" },
+            new RoleTypeDefinition { Id = 14, Name = "Maternal Grandmother of the Bride" }
         );
 
         // ── Seed: SongCategories ───────────────────────────────────────────

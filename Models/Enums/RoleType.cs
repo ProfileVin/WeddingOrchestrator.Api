@@ -16,5 +16,6 @@ public enum RoleType
     PaternalGrandmotherOfBride = 12,
     MaternalGrandfatherOfBride = 13,
     MaternalGrandmotherOfBride = 14,
-    WeddingItself = 15
+    WeddingItself = 15,
+    OtherRelation = 16
 }

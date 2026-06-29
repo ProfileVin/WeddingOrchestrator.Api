@@ -25,7 +25,7 @@ public class SearchController : ControllerBase
         var lowerTerm = term.ToLower();
 
         var rawPeople = await _db.People
-            .Include(p => p.WeddingRoles)
+            .Include(p => p.WeddingDetails)
             .Where(p => p.FirstName.ToLower().Contains(lowerTerm)
                      || p.LastName.ToLower().Contains(lowerTerm)
                      || (p.FirstName.ToLower() + " " + p.LastName.ToLower()).Contains(lowerTerm))
@@ -38,9 +38,9 @@ public class SearchController : ControllerBase
             Id = p.Id,
             FullName = p.FullName,
             Gender = p.Gender.ToString().ToLower(),
-            Roles = p.WeddingRoles
-                .Where(wr => wr.RoleType != RoleType.WeddingItself)
-                .Select(wr => RoleHelper.GetLabel(wr.RoleType))
+            Roles = p.WeddingDetails
+                .Where(d => d.RoleType != RoleType.WeddingItself)
+                .Select(d => RoleHelper.GetLabel(d.RoleType))
                 .Distinct()
                 .Take(2)
                 .ToList()
@@ -64,10 +64,10 @@ public class SearchController : ControllerBase
         // Collect IDs via base match (location or any person name)
         var weddingIds = await _db.Weddings
             .Where(w => (w.Location != null && w.Location.ToLower().Contains(lowerTerm))
-                || w.Roles.Any(r => r.Person != null &&
-                    (r.Person.FirstName.ToLower().Contains(lowerTerm) ||
-                     r.Person.LastName.ToLower().Contains(lowerTerm) ||
-                     (r.Person.FirstName.ToLower() + " " + r.Person.LastName.ToLower()).Contains(lowerTerm))))
+                || w.Details.Any(d => d.Person != null &&
+                    (d.Person.FirstName.ToLower().Contains(lowerTerm) ||
+                     d.Person.LastName.ToLower().Contains(lowerTerm) ||
+                     (d.Person.FirstName.ToLower() + " " + d.Person.LastName.ToLower()).Contains(lowerTerm))))
             .Select(w => w.Id)
             .ToListAsync();
 
@@ -85,10 +85,10 @@ public class SearchController : ControllerBase
                 var bp = bridePart;
                 var titleMatchIds = await _db.Weddings
                     .Where(w =>
-                        w.Roles.Any(r => r.RoleType == RoleType.Groom && r.Person != null
-                            && r.Person.LastName.ToLower().Contains(gp))
-                        && (bp == string.Empty || w.Roles.Any(r => r.RoleType == RoleType.Bride && r.Person != null
-                            && r.Person.LastName.ToLower().Contains(bp))))
+                        w.Details.Any(d => d.RoleType == RoleType.Groom && d.Person != null
+                            && d.Person.LastName.ToLower().Contains(gp))
+                        && (bp == string.Empty || w.Details.Any(d => d.RoleType == RoleType.Bride && d.Person != null
+                            && d.Person.LastName.ToLower().Contains(bp))))
                     .Select(w => w.Id)
                     .ToListAsync();
                 weddingIds = weddingIds.Union(titleMatchIds).ToList();
@@ -96,7 +96,7 @@ public class SearchController : ControllerBase
         }
 
         var rawWeddings = await _db.Weddings
-            .Include(w => w.Roles).ThenInclude(r => r.Person)
+            .Include(w => w.Details).ThenInclude(d => d.Person)
             .Where(w => weddingIds.Contains(w.Id))
             .OrderByDescending(w => w.DateOfWedding)
             .Take(5)

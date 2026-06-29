@@ -30,7 +30,6 @@ builder.Services.AddCors(options =>
 
 builder.Services.AddScoped<ISongService, SongService>();
 builder.Services.AddScoped<IPersonService, PersonService>();
-builder.Services.AddScoped<IPersonNoteService, PersonNoteService>();
 builder.Services.AddScoped<IWeddingService, WeddingService>();
 builder.Services.AddScoped<IConflictDetectionService, ConflictDetectionService>();
 builder.Services.AddScoped<IDocxService, DocxService>();

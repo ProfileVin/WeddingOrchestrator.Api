@@ -11,5 +11,4 @@ public class Song
     public DateTime CreatedUtc { get; set; }
 
     public SongCategory Category { get; set; } = null!;
-    public ICollection<WeddingRoleSongAssignment> Assignments { get; set; } = new List<WeddingRoleSongAssignment>();
 }

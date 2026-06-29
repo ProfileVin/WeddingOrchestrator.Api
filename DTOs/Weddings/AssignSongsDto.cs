@@ -8,6 +8,7 @@ public class AssignSongsDto
 public class SongAssignmentInputDto
 {
     public int WeddingRoleId { get; set; }
+    public int? PersonId { get; set; }
     public int AssignmentSlot { get; set; }
     public int SongId { get; set; }
 }

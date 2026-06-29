@@ -42,4 +42,8 @@ public class FamilyTreeController : ControllerBase
     [HttpPost("add-member")]
     public async Task<ActionResult<PersonDto>> AddFamilyMember([FromBody] AddFamilyMemberDto dto)
         => Ok(await _service.AddFamilyMemberAsync(dto));
+
+    [HttpPost("add-wedding-relative")]
+    public async Task<ActionResult<PersonDto>> AddWeddingRelative([FromBody] AddWeddingRelativeDto dto)
+        => Ok(await _service.AddWeddingRelativeAsync(dto));
 }

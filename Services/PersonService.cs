@@ -19,20 +19,23 @@ public class PersonService : IPersonService
         var people = await _db.People
             .Include(p => p.Father)
             .Include(p => p.Mother)
-            .Include(p => p.WeddingRoles)
-                .ThenInclude(wr => wr.Wedding)
-                    .ThenInclude(w => w.Roles)
-                        .ThenInclude(r => r.Person)
             .AsSplitQuery()
             .OrderBy(p => p.LastName).ThenBy(p => p.FirstName)
             .ToListAsync();
 
-        var latestNotes = await _db.PersonNotes
-            .GroupBy(n => n.PersonId)
-            .Select(g => new { PersonId = g.Key, Content = g.OrderByDescending(n => n.CreatedAt).First().Content })
+        var latestNotes = await _db.WeddingDetails
+            .Where(d => d.PersonId.HasValue && d.Note != null)
+            .GroupBy(d => d.PersonId!.Value)
+            .Select(g => new { PersonId = g.Key, Content = g.OrderByDescending(d => d.Id).First().Note! })
             .ToDictionaryAsync(x => x.PersonId, x => x.Content);
 
-        return people.Select(p => MapDto(p, latestNotes)).ToList();
+        var weddingCounts = await _db.WeddingDetails
+            .Where(d => d.PersonId.HasValue)
+            .GroupBy(d => d.PersonId!.Value)
+            .Select(g => new { PersonId = g.Key, Count = g.Select(d => d.WeddingId).Distinct().Count() })
+            .ToDictionaryAsync(x => x.PersonId, x => x.Count);
+
+        return people.Select(p => MapDto(p, latestNotes, weddingCounts)).ToList();
     }
 
     public async Task<List<PersonDto>> SearchAsync(string query, RoleType? roleType = null)
@@ -72,17 +75,17 @@ public class PersonService : IPersonService
 
             if (fatherGrandfatherRoles.Contains(roleType.Value))
             {
-                var pastGroomIds = _db.WeddingRoles
-                    .Where(r => r.RoleType == RoleType.Groom && r.PersonId.HasValue)
-                    .Select(r => r.PersonId!.Value);
+                var pastGroomIds = _db.WeddingDetails
+                    .Where(d => d.RoleType == RoleType.Groom && d.PersonId.HasValue)
+                    .Select(d => d.PersonId!.Value);
                 baseQuery = baseQuery.Where(p => !pastGroomIds.Contains(p.Id));
             }
 
             if (motherGrandmotherRoles.Contains(roleType.Value))
             {
-                var pastBrideIds = _db.WeddingRoles
-                    .Where(r => r.RoleType == RoleType.Bride && r.PersonId.HasValue)
-                    .Select(r => r.PersonId!.Value);
+                var pastBrideIds = _db.WeddingDetails
+                    .Where(d => d.RoleType == RoleType.Bride && d.PersonId.HasValue)
+                    .Select(d => d.PersonId!.Value);
                 baseQuery = baseQuery.Where(p => !pastBrideIds.Contains(p.Id));
             }
         }
@@ -111,8 +114,8 @@ public class PersonService : IPersonService
             .Include(p => p.Father).ThenInclude(f => f!.Mother)
             .Include(p => p.Mother).ThenInclude(m => m!.Father)
             .Include(p => p.Mother).ThenInclude(m => m!.Mother)
-            .Include(p => p.WeddingRoles).ThenInclude(wr => wr.Wedding).ThenInclude(w => w.Roles).ThenInclude(r => r.Person)
-            .Include(p => p.WeddingRoles).ThenInclude(wr => wr.SongAssignments).ThenInclude(sa => sa.Song)
+            .Include(p => p.WeddingDetails).ThenInclude(d => d.Wedding).ThenInclude(w => w.Details).ThenInclude(d => d.Person)
+            .Include(p => p.WeddingDetails).ThenInclude(d => d.Song)
             .AsSplitQuery()
             .FirstOrDefaultAsync(p => p.Id == id)
             ?? throw new KeyNotFoundException($"Person {id} not found.");
@@ -126,26 +129,36 @@ public class PersonService : IPersonService
                 .ToListAsync()
             : new List<Person>();
 
-        var weddings = person.WeddingRoles
-            .Where(wr => wr.RoleType != RoleType.WeddingItself)
-            .OrderByDescending(wr => wr.Wedding.DateOfWedding)
-            .Select(wr => new PersonWeddingDto
+        var weddings = person.WeddingDetails
+            .Where(d => d.RoleType != RoleType.WeddingItself)
+            .DistinctBy(d => d.WeddingId)
+            .OrderByDescending(d => d.Wedding.DateOfWedding)
+            .Select(d => new PersonWeddingDto
             {
-                WeddingId = wr.WeddingId,
-                Title = WeddingTitleHelper.Compute(wr.Wedding),
-                Date = wr.Wedding.DateOfWedding.ToString("MMM d, yyyy"),
-                Location = wr.Wedding.Location,
-                Role = RoleHelper.GetLabel(wr.RoleType),
-                IsFinalized = wr.Wedding.IsFinalized,
-                SongTitle = wr.SongAssignments.FirstOrDefault()?.Song?.Title
+                WeddingId = d.WeddingId,
+                Title = WeddingTitleHelper.Compute(d.Wedding),
+                Date = d.Wedding.DateOfWedding.ToString("MMM d, yyyy"),
+                Location = d.Wedding.Location,
+                Role = RoleHelper.GetLabel(d.RoleType),
+                IsFinalized = d.Wedding.IsFinalized,
+                SongTitle = d.Song?.Title,
             })
             .ToList();
 
-        var notes = await _db.PersonNotes
-            .Where(n => n.PersonId == id)
-            .Include(n => n.Wedding).ThenInclude(w => w!.Roles).ThenInclude(r => r.Person)
-            .OrderByDescending(n => n.CreatedAt)
-            .ToListAsync();
+        // Build notes from WeddingDetail.Note (replaces PersonNote table)
+        var notes = person.WeddingDetails
+            .Where(d => d.Note != null)
+            .OrderByDescending(d => d.Id)
+            .Select(d => new PersonNoteDto
+            {
+                Id = d.Id,
+                PersonId = id,
+                WeddingId = d.WeddingId,
+                WeddingTitle = $"{WeddingTitleHelper.Compute(d.Wedding)} ({d.Wedding.DateOfWedding.Year})",
+                Content = d.Note!,
+                CreatedAt = DateTime.MinValue, // no separate timestamp; ordering by Id
+            })
+            .ToList();
 
         var profile = new PersonProfileDto
         {
@@ -162,37 +175,27 @@ public class PersonService : IPersonService
             MaternalGrandfather = person.Mother?.Father != null ? ToSummary(person.Mother.Father) : null,
             MaternalGrandmother = person.Mother?.Mother != null ? ToSummary(person.Mother.Mother) : null,
             Weddings = weddings,
-            Notes = notes.Select(n => new PersonNoteDto
-            {
-                Id = n.Id,
-                PersonId = n.PersonId,
-                WeddingId = n.WeddingId,
-                WeddingTitle = n.Wedding != null
-                    ? $"{WeddingTitleHelper.Compute(n.Wedding)} ({n.Wedding.DateOfWedding.Year})"
-                    : null,
-                Content = n.Content,
-                CreatedAt = n.CreatedAt,
-            }).ToList(),
+            Notes = notes,
         };
 
-        AugmentProfileFromWeddingRoles(person, profile);
+        AugmentProfileFromWeddingDetails(person, profile);
 
         return profile;
     }
 
-    private static void AugmentProfileFromWeddingRoles(Person person, PersonProfileDto profile)
+    private static void AugmentProfileFromWeddingDetails(Person person, PersonProfileDto profile)
     {
-        foreach (var wr in person.WeddingRoles)
+        foreach (var d in person.WeddingDetails.DistinctBy(x => new { x.WeddingId, x.RoleType }))
         {
-            var wRoles = wr.Wedding.Roles;
+            var wDetails = d.Wedding.Details;
 
             PersonSummaryDto? Derive(RoleType rt)
             {
-                var p = wRoles.FirstOrDefault(r => r.RoleType == rt && r.Person != null)?.Person;
+                var p = wDetails.FirstOrDefault(r => r.RoleType == rt && r.Person != null)?.Person;
                 return p != null ? ToSummary(p) : null;
             }
 
-            switch (wr.RoleType)
+            switch (d.RoleType)
             {
                 case RoleType.Groom:
                     profile.Father              ??= Derive(RoleType.FatherOfGroom);
@@ -284,16 +287,9 @@ public class PersonService : IPersonService
 
         int childTypeId = gender == Gender.Female ? DaughterTypeId : SonTypeId;
 
-        // Convention:
-        //   FATHER/MOTHER (delta +1): FROM=parent, TO=child  — "parent IS THE FATHER/MOTHER OF child"
-        //   SON/DAUGHTER  (delta -1): FROM=child,  TO=parent — "child IS THE SON/DAUGHTER OF parent"
-        //
-        // Remove old parent-child rows for this person before rebuilding.
         var oldRels = await _db.PersonRelationships
             .Where(r =>
-                // parent declared this person as their child: FROM=parent, TO=personId, type=FATHER/MOTHER
                 (r.ToPersonId   == personId && (r.RelationshipTypeId == FatherTypeId || r.RelationshipTypeId == MotherTypeId)) ||
-                // this person declared their parent: FROM=personId, TO=parent, type=SON/DAUGHTER
                 (r.FromPersonId == personId && (r.RelationshipTypeId == SonTypeId    || r.RelationshipTypeId == DaughterTypeId)))
             .ToListAsync();
         _db.PersonRelationships.RemoveRange(oldRels);
@@ -302,17 +298,13 @@ public class PersonService : IPersonService
 
         if (fatherId.HasValue)
         {
-            // "father IS THE FATHER OF child": FROM=father, TO=child
             newRels.Add(new PersonRelationship { FromPersonId = fatherId.Value, ToPersonId = personId,       RelationshipTypeId = FatherTypeId, IsActive = true, CreatedAt = DateTime.UtcNow });
-            // "child IS THE SON/DAUGHTER OF father": FROM=child, TO=father
             newRels.Add(new PersonRelationship { FromPersonId = personId,       ToPersonId = fatherId.Value, RelationshipTypeId = childTypeId,  IsActive = true, CreatedAt = DateTime.UtcNow });
         }
 
         if (motherId.HasValue)
         {
-            // "mother IS THE MOTHER OF child": FROM=mother, TO=child
             newRels.Add(new PersonRelationship { FromPersonId = motherId.Value, ToPersonId = personId,       RelationshipTypeId = MotherTypeId, IsActive = true, CreatedAt = DateTime.UtcNow });
-            // "child IS THE SON/DAUGHTER OF mother": FROM=child, TO=mother
             newRels.Add(new PersonRelationship { FromPersonId = personId,       ToPersonId = motherId.Value, RelationshipTypeId = childTypeId,  IsActive = true, CreatedAt = DateTime.UtcNow });
         }
 
@@ -328,7 +320,7 @@ public class PersonService : IPersonService
         var person = await _db.People.FindAsync(id)
             ?? throw new KeyNotFoundException($"Person {id} not found.");
 
-        var isInWedding = await _db.WeddingRoles.AnyAsync(r => r.PersonId == id);
+        var isInWedding = await _db.WeddingDetails.AnyAsync(d => d.PersonId == id);
         if (isInWedding)
             throw new DomainException("Cannot delete a person who is assigned to a wedding role.");
 
@@ -358,39 +350,15 @@ public class PersonService : IPersonService
         .Include(p => p.Mother).ThenInclude(m => m!.Father)
         .Include(p => p.Mother).ThenInclude(m => m!.Mother);
 
-    private static string? ComputeFamilyGroup(Person p)
-    {
-        var wedding = p.WeddingRoles?
-            .Where(wr => wr.RoleType != RoleType.WeddingItself && wr.Wedding != null)
-            .OrderByDescending(wr => wr.Wedding.DateOfWedding)
-            .Select(wr => wr.Wedding)
-            .FirstOrDefault();
-
-        if (wedding?.Roles == null) return null;
-
-        var groomLastName = wedding.Roles
-            .FirstOrDefault(r => r.RoleType == RoleType.Groom)?.Person?.LastName;
-        var brideLastName = wedding.Roles
-            .FirstOrDefault(r => r.RoleType == RoleType.Bride)?.Person?.LastName;
-
-        return (groomLastName, brideLastName) switch
-        {
-            (not null, not null) => $"{groomLastName} - {brideLastName}",
-            (not null, null)     => groomLastName,
-            (null, not null)     => brideLastName,
-            _                    => null
-        };
-    }
-
-    private static PersonDto MapDto(Person p, Dictionary<int, string>? latestNotes = null) => new()
+    private static PersonDto MapDto(Person p, Dictionary<int, string>? latestNotes = null, Dictionary<int, int>? weddingCounts = null) => new()
     {
         Id = p.Id,
         FirstName = p.FirstName,
         LastName = p.LastName,
         FullName = p.FullName,
         Gender = p.Gender.ToString().ToLower(),
-        FamilyGroup = ComputeFamilyGroup(p),
-        WeddingCount = p.WeddingRoles?.Count(wr => wr.RoleType != RoleType.WeddingItself) ?? 0,
+        FamilyGroup = p.FamilyGroup,
+        WeddingCount = weddingCounts?.GetValueOrDefault(p.Id) ?? 0,
         LastNote = latestNotes?.GetValueOrDefault(p.Id),
         FatherId = p.FatherId,
         FatherName = p.Father?.FullName,

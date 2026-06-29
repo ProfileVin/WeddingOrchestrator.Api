@@ -12,4 +12,6 @@ public interface IFamilyTreeService
     Task<PersonRelationshipDto> CreateRelationshipAsync(CreateRelationshipDto dto);
     Task DeleteRelationshipAsync(int id);
     Task<PersonDto> AddFamilyMemberAsync(AddFamilyMemberDto dto);
+    Task<PersonDto> AddWeddingRelativeAsync(AddWeddingRelativeDto dto);
+    Task BuildRelationshipsForExistingPersonAsync(int personId, int relatedPersonId, string typeCode, int weddingId);
 }
