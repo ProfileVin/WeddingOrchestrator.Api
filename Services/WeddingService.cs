@@ -542,6 +542,24 @@ public class WeddingService : IWeddingService
         return await GetByIdAsync(weddingId);
     }
 
+    public async Task DeleteOtherRelationAsync(int weddingId, int personId)
+    {
+        var detail = await _db.WeddingDetails
+            .FirstOrDefaultAsync(d => d.WeddingId == weddingId && d.PersonId == personId && d.RoleType == RoleType.OtherRelation);
+        if (detail == null) return;
+        _db.WeddingDetails.Remove(detail);
+
+        var relationships = await _db.PersonRelationships
+            .Where(r => r.FromPersonId == personId || r.ToPersonId == personId)
+            .ToListAsync();
+        _db.PersonRelationships.RemoveRange(relationships);
+
+        var person = await _db.People.FindAsync(personId);
+        if (person != null) _db.People.Remove(person);
+
+        await _db.SaveChangesAsync();
+    }
+
     public async Task DeleteAsync(int id)
     {
         var wedding = await _db.Weddings.FindAsync(id)
