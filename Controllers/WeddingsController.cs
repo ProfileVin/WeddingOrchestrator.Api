@@ -61,6 +61,18 @@ public class WeddingsController : ControllerBase
     public async Task<IActionResult> Unfinalize(int id) =>
         Ok(await _weddings.UnfinalizeAsync(id));
 
+    [HttpPost("{id:int}/other-relations")]
+    public async Task<IActionResult> LinkOtherRelations(int id, [FromBody] List<LinkOtherRelationDto> dto) =>
+        Ok(await _weddings.LinkOtherRelationsAsync(id, dto));
+
+    [HttpPut("{id:int}/detail-note")]
+    public async Task<IActionResult> UpdateDetailNote(int id, [FromBody] UpdateDetailNoteDto dto) =>
+        Ok(await _weddings.UpdateDetailNoteAsync(id, dto));
+
+    [HttpPut("{id:int}/song-intros")]
+    public async Task<IActionResult> UpdateSongIntros(int id, [FromBody] UpdateWeddingSongIntrosDto dto) =>
+        Ok(await _weddings.UpdateWeddingSongIntrosAsync(id, dto));
+
     [HttpPost("{id:int}/sync-folder")]
     public async Task<IActionResult> SyncFolder(int id)
     {

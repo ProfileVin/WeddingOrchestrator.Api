@@ -17,7 +17,7 @@ public class Person
     public Person? Father { get; set; }
     public Person? Mother { get; set; }
 
-    public ICollection<WeddingRole> WeddingRoles { get; set; } = new List<WeddingRole>();
+    public ICollection<WeddingDetail> WeddingDetails { get; set; } = new List<WeddingDetail>();
 
     public string FullName => $"{FirstName} {LastName}".Trim();
 }

@@ -153,13 +153,11 @@ public class SongService : ISongService
     public async Task DeleteSongAsync(int id)
     {
         var song = await _db.Songs
-            .Include(s => s.Assignments)
             .FirstOrDefaultAsync(s => s.Id == id)
             ?? throw new KeyNotFoundException($"Song {id} not found.");
 
         var absolutePath = Path.Combine(_storageRoot, song.RelativeFilePath);
 
-        _db.WeddingRoleSongAssignments.RemoveRange(song.Assignments);
         _db.Songs.Remove(song);
         await _db.SaveChangesAsync();
 

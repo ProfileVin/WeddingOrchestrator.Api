@@ -12,6 +12,9 @@ public class WeddingRoleDto
     public string? PersonFirstName { get; set; }
     public string? PersonLastName { get; set; }
     public string DisplayName => PersonName ?? string.Empty;
+    public string? InWeddingRelationTypeLabel { get; set; }
+    public string? WeddingSide { get; set; }
+    public string? Note { get; set; }
     public List<SongAssignmentDto> SongAssignments { get; set; } = new();
     public List<AvailableSongDto> AvailableSongs { get; set; } = new();
 }

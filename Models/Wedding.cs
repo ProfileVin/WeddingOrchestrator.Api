@@ -11,5 +11,13 @@ public class Wedding
     public DateTime CreatedUtc { get; set; }
     public DateTime? UpdatedDate { get; set; }
 
-    public ICollection<WeddingRole> Roles { get; set; } = new List<WeddingRole>();
+    public int? WeddingSongIntroId { get; set; }
+    public int? FatherMotherWeddingSongIntroGroomId { get; set; }
+    public int? FatherMotherWeddingSongIntroBrideId { get; set; }
+
+    public Song? WeddingSongIntro { get; set; }
+    public Song? FatherMotherWeddingSongIntroGroom { get; set; }
+    public Song? FatherMotherWeddingSongIntroBride { get; set; }
+
+    public ICollection<WeddingDetail> Details { get; set; } = new List<WeddingDetail>();
 }

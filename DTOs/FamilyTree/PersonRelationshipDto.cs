@@ -7,6 +7,7 @@ public class PersonRelationshipDto
     public string FromPersonName { get; set; } = string.Empty;
     public int ToPersonId { get; set; }
     public string ToPersonName { get; set; } = string.Empty;
+    public int RelationshipTypeId { get; set; }
     public string TypeCode { get; set; } = string.Empty;
     public string TypeLabel { get; set; } = string.Empty;
     public string Category { get; set; } = string.Empty;

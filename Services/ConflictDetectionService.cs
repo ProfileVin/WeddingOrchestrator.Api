@@ -14,35 +14,28 @@ public class ConflictDetectionService : IConflictDetectionService
 
     public async Task<ConflictReportDto> GetConflictReportAsync(int weddingId)
     {
-        // Step 1: all people in the new wedding
-        var newPersonIds = await _db.WeddingRoles
-            .Where(r => r.WeddingId == weddingId && r.PersonId != null)
-            .Select(r => r.PersonId!.Value)
+        var newPersonIds = await _db.WeddingDetails
+            .Where(d => d.WeddingId == weddingId && d.PersonId != null)
+            .Select(d => d.PersonId!.Value)
             .Distinct()
             .ToListAsync();
 
         if (!newPersonIds.Any())
             return new ConflictReportDto();
 
-        // Step 2: other weddings that share at least one person
-        var conflictingWeddingIds = await _db.WeddingRoles
-            .Where(r => r.PersonId != null && newPersonIds.Contains(r.PersonId.Value) && r.WeddingId != weddingId)
-            .Select(r => r.WeddingId)
+        var conflictingWeddingIds = await _db.WeddingDetails
+            .Where(d => d.PersonId != null && newPersonIds.Contains(d.PersonId.Value) && d.WeddingId != weddingId)
+            .Select(d => d.WeddingId)
             .Distinct()
             .ToListAsync();
 
         if (!conflictingWeddingIds.Any())
             return new ConflictReportDto();
 
-        // Step 3: load conflicting weddings with full detail
         var conflictingWeddings = await _db.Weddings
             .Where(w => conflictingWeddingIds.Contains(w.Id))
-            .Include(w => w.Roles)
-                .ThenInclude(r => r.Person)
-            .Include(w => w.Roles)
-                .ThenInclude(r => r.SongAssignments)
-                    .ThenInclude(a => a.Song)
-                        .ThenInclude(s => s.Category)
+            .Include(w => w.Details).ThenInclude(d => d.Person)
+            .Include(w => w.Details).ThenInclude(d => d.Song!).ThenInclude(s => s.Category)
             .AsSplitQuery()
             .ToListAsync();
 
@@ -57,35 +50,35 @@ public class ConflictDetectionService : IConflictDetectionService
                 WeddingTitle = WeddingTitleHelper.Compute(cw)
             };
 
-            // Which people are shared?
-            foreach (var role in cw.Roles.Where(r => r.PersonId != null && newPersonIds.Contains(r.PersonId.Value)))
+            foreach (var detail in cw.Details.Where(d => d.PersonId != null && newPersonIds.Contains(d.PersonId.Value)))
             {
                 cwDto.SharedPeople.Add(new SharedPersonDto
                 {
-                    PersonId = role.PersonId!.Value,
-                    PersonName = role.Person?.FullName ?? string.Empty,
-                    RoleInThatWedding = RoleHelper.GetLabel(role.RoleType),
-                    SongsHeard = role.SongAssignments.Select(a => a.Song.Title).ToList()
+                    PersonId = detail.PersonId!.Value,
+                    PersonName = detail.Person?.FullName ?? string.Empty,
+                    RoleInThatWedding = RoleHelper.GetLabel(detail.RoleType),
+                    SongsHeard = detail.SongId.HasValue && detail.Song != null
+                        ? new List<string> { detail.Song.Title }
+                        : new List<string>()
                 });
             }
 
-            // All songs used in that wedding, grouped by category
-            var songsByCat = cw.Roles
-                .SelectMany(r => r.SongAssignments)
-                .GroupBy(a => a.Song.Category.Name)
+            var songsByCat = cw.Details
+                .Where(d => d.SongId.HasValue && d.Song != null)
+                .GroupBy(d => d.Song!.Category?.Name ?? string.Empty)
                 .OrderBy(g => g.Key);
 
             foreach (var catGroup in songsByCat)
             {
                 var catDto = new ForbiddenCategoryDto { CategoryName = catGroup.Key };
-                foreach (var assignment in catGroup)
+                foreach (var detail in catGroup)
                 {
                     catDto.Songs.Add(new ForbiddenSongDto
                     {
-                        SongId = assignment.SongId,
-                        SongTitle = assignment.Song.Title
+                        SongId = detail.SongId!.Value,
+                        SongTitle = detail.Song!.Title
                     });
-                    allForbiddenIds.Add(assignment.SongId);
+                    allForbiddenIds.Add(detail.SongId!.Value);
                 }
                 cwDto.ForbiddenSongsByCategory.Add(catDto);
             }

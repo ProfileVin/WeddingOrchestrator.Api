@@ -13,4 +13,5 @@ public class CreateWeddingDto
     public string? BrideFirstName { get; set; }
     public string? BrideLastName { get; set; }
     public int? WeddingIntroSongId { get; set; }
+    public string? Notes { get; set; }
 }
