@@ -65,6 +65,13 @@ public class WeddingsController : ControllerBase
     public async Task<IActionResult> LinkOtherRelations(int id, [FromBody] List<LinkOtherRelationDto> dto) =>
         Ok(await _weddings.LinkOtherRelationsAsync(id, dto));
 
+    [HttpDelete("{id:int}/other-relations/{personId:int}")]
+    public async Task<IActionResult> DeleteOtherRelation(int id, int personId)
+    {
+        await _weddings.DeleteOtherRelationAsync(id, personId);
+        return NoContent();
+    }
+
     [HttpPut("{id:int}/detail-note")]
     public async Task<IActionResult> UpdateDetailNote(int id, [FromBody] UpdateDetailNoteDto dto) =>
         Ok(await _weddings.UpdateDetailNoteAsync(id, dto));
