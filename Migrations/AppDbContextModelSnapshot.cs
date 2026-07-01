@@ -482,6 +482,78 @@ namespace WeddingOrchestrator.Api.Migrations
                             IsActive = true,
                             TypeCode = "HALF_SISTER",
                             TypeLabel = "Half-sister"
+                        },
+                        new
+                        {
+                            Id = 36,
+                            Category = "STEP",
+                            GenerationDelta = 2,
+                            IsActive = true,
+                            TypeCode = "STEP_GRANDFATHER",
+                            TypeLabel = "Step-grandfather"
+                        },
+                        new
+                        {
+                            Id = 37,
+                            Category = "STEP",
+                            GenerationDelta = 2,
+                            IsActive = true,
+                            TypeCode = "STEP_GRANDMOTHER",
+                            TypeLabel = "Step-grandmother"
+                        },
+                        new
+                        {
+                            Id = 38,
+                            Category = "STEP",
+                            GenerationDelta = -2,
+                            IsActive = true,
+                            TypeCode = "STEP_GRANDSON",
+                            TypeLabel = "Step-grandson"
+                        },
+                        new
+                        {
+                            Id = 39,
+                            Category = "STEP",
+                            GenerationDelta = -2,
+                            IsActive = true,
+                            TypeCode = "STEP_GRANDDAUGHTER",
+                            TypeLabel = "Step-granddaughter"
+                        },
+                        new
+                        {
+                            Id = 40,
+                            Category = "INLAW",
+                            GenerationDelta = -2,
+                            IsActive = true,
+                            TypeCode = "GRANDSON_IN_LAW",
+                            TypeLabel = "Grandson-in-law"
+                        },
+                        new
+                        {
+                            Id = 41,
+                            Category = "INLAW",
+                            GenerationDelta = -2,
+                            IsActive = true,
+                            TypeCode = "GRANDDAUGHTER_IN_LAW",
+                            TypeLabel = "Granddaughter-in-law"
+                        },
+                        new
+                        {
+                            Id = 42,
+                            Category = "INLAW",
+                            GenerationDelta = 2,
+                            IsActive = true,
+                            TypeCode = "GRANDFATHER_IN_LAW",
+                            TypeLabel = "Grandfather-in-law"
+                        },
+                        new
+                        {
+                            Id = 43,
+                            Category = "INLAW",
+                            GenerationDelta = 2,
+                            IsActive = true,
+                            TypeCode = "GRANDMOTHER_IN_LAW",
+                            TypeLabel = "Grandmother-in-law"
                         });
                 });
 
