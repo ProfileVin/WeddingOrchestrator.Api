@@ -133,6 +133,21 @@ public class WeddingService : IWeddingService
         return await GetByIdAsync(wedding.Id);
     }
 
+    public async Task<WeddingDto> UpdateDetailsAsync(int id, UpdateWeddingDetailsDto dto)
+    {
+        var wedding = await _db.Weddings.FindAsync(id)
+            ?? throw new KeyNotFoundException($"Wedding {id} not found.");
+
+        wedding.DateOfWedding = dto.DateOfWedding;
+        wedding.StartTime = dto.StartTime;
+        wedding.EndTime = dto.EndTime;
+        wedding.Location = dto.Location;
+        wedding.UpdatedDate = DateTime.Now;
+
+        await _db.SaveChangesAsync();
+        return await GetByIdAsync(id);
+    }
+
     public async Task<WeddingDto> UpdateRolesAsync(int id, WeddingFamilyTreeDto dto)
     {
         var wedding = await _db.Weddings.FindAsync(id)

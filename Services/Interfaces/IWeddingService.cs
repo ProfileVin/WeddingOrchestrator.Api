@@ -9,6 +9,7 @@ public interface IWeddingService
     Task<List<WeddingListItemDto>> CheckAvailabilityAsync(DateTime date, TimeOnly? startTime, TimeOnly? endTime);
     Task<WeddingDto> GetByIdAsync(int id);
     Task<WeddingDto> CreateAsync(CreateWeddingDto dto);
+    Task<WeddingDto> UpdateDetailsAsync(int id, UpdateWeddingDetailsDto dto);
     Task<WeddingDto> UpdateRolesAsync(int id, WeddingFamilyTreeDto dto);
     Task<WeddingDto> AssignSongsAsync(int id, AssignSongsDto dto);
     Task<WeddingDto> FinalizeAsync(int id);

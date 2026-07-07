@@ -41,6 +41,10 @@ public class WeddingsController : ControllerBase
         return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
     }
 
+    [HttpPut("{id:int}")]
+    public async Task<IActionResult> UpdateDetails(int id, [FromBody] UpdateWeddingDetailsDto dto) =>
+        Ok(await _weddings.UpdateDetailsAsync(id, dto));
+
     [HttpPut("{id:int}/roles")]
     public async Task<IActionResult> UpdateRoles(int id, [FromBody] WeddingFamilyTreeDto dto) =>
         Ok(await _weddings.UpdateRolesAsync(id, dto));
