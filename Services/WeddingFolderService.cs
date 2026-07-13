@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using WeddingOrchestrator.Api.Data;
 using WeddingOrchestrator.Api.Infrastructure;
@@ -35,6 +36,7 @@ public class WeddingFolderService : IWeddingFolderService
             ?? throw new KeyNotFoundException($"Wedding {weddingId} not found.");
 
         var weddingDir  = ResolveWeddingDir(wedding, weddingId);
+        MarkWeddingDirOwnership(weddingDir, weddingId);
         var songsFolder = Path.Combine(weddingDir, "Songs");
         Directory.CreateDirectory(songsFolder);
 
@@ -92,7 +94,7 @@ public class WeddingFolderService : IWeddingFolderService
             ?? throw new KeyNotFoundException($"Wedding {weddingId} not found.");
 
         var weddingDir = ResolveWeddingDir(wedding, weddingId);
-        Directory.CreateDirectory(weddingDir);
+        MarkWeddingDirOwnership(weddingDir, weddingId);
 
         var personIds = wedding.Details
             .Where(d => d.PersonId.HasValue)
@@ -188,14 +190,8 @@ public class WeddingFolderService : IWeddingFolderService
         var detail = wedding.Details.FirstOrDefault(d => d.RoleType == roleType && d.SongId.HasValue);
         if (detail?.Song == null) return null;
 
-        var groomDetail = wedding.Details.FirstOrDefault(d => d.RoleType == RoleType.Groom);
-        var brideDetail = wedding.Details.FirstOrDefault(d => d.RoleType == RoleType.Bride);
-        var groomName = SanitizeFolderSegment(groomDetail?.Person?.LastName ?? "Groom");
-        var brideName = SanitizeFolderSegment(brideDetail?.Person?.LastName ?? "Bride");
-
-        var dateSegment = wedding.DateOfWedding.ToString("yyyy-MM-dd");
-        var coupleFolder = $"{groomName}-{brideName}";
-        var songsFolder = Path.Combine(_weddingOutputRoot, dateSegment, weddingId.ToString(), coupleFolder, "Songs");
+        var weddingDir = ResolveWeddingDir(wedding, weddingId);
+        var songsFolder = Path.Combine(weddingDir, "Songs");
 
         var label = assignmentSlot > 1
             ? $"{RoleHelper.GetLabel(roleType)} (Slot {assignmentSlot})"
@@ -223,7 +219,7 @@ public class WeddingFolderService : IWeddingFolderService
             .ToList();
 
         var weddingDir = ResolveWeddingDir(wedding, weddingId);
-        Directory.CreateDirectory(weddingDir);
+        MarkWeddingDirOwnership(weddingDir, weddingId);
 
         var pastDetails = await QueryPastDetailsAsync(personIds, weddingId);
         var content = BuildHistoryText(wedding, pastDetails);
@@ -239,8 +235,48 @@ public class WeddingFolderService : IWeddingFolderService
         var brideDetail = wedding.Details.FirstOrDefault(d => d.RoleType == RoleType.Bride);
         var groomName = SanitizeFolderSegment(groomDetail?.Person?.LastName ?? "Groom");
         var brideName = SanitizeFolderSegment(brideDetail?.Person?.LastName ?? "Bride");
-        var dateSegment = wedding.DateOfWedding.ToString("yyyy-MM-dd");
-        return Path.Combine(_weddingOutputRoot, dateSegment, weddingId.ToString(), $"{groomName}-{brideName}");
+
+        var gregorianYear = wedding.DateOfWedding.ToString("yyyy", CultureInfo.InvariantCulture);
+        var gregorianMonth = wedding.DateOfWedding.ToString("MMM", CultureInfo.InvariantCulture);
+        var (hebrewDay, hebrewMonth, hebrewYear) = HebrewDateHelper.GetHebrewParts(wedding.DateOfWedding);
+        var coupleFolder = SanitizeFolderSegment($"{brideName} - {groomName} - {hebrewDay} {hebrewMonth} {hebrewYear}");
+
+        var baseDir = Path.Combine(_weddingOutputRoot, gregorianYear, gregorianMonth, coupleFolder);
+        return ResolveWithCollisionSuffix(baseDir, weddingId);
+    }
+
+    /// <summary>
+    /// Two different weddings can land on the same bride/groom/Hebrew-date folder name.
+    /// Ownership is tracked via a ".wedding-id" marker file so repeat calls for the same
+    /// wedding keep resolving to the same folder, while a genuine collision gets " (2)", " (3)", etc.
+    /// Read-only: does not create anything on disk, so it's safe to call from path lookups
+    /// that don't want side effects.
+    /// </summary>
+    private static string ResolveWithCollisionSuffix(string baseDir, int weddingId)
+    {
+        var candidate = baseDir;
+        var suffix = 1;
+
+        while (Directory.Exists(candidate) && !OwnsDir(candidate, weddingId))
+        {
+            suffix++;
+            candidate = $"{baseDir} ({suffix})";
+        }
+
+        return candidate;
+    }
+
+    private static bool OwnsDir(string dir, int weddingId)
+    {
+        var markerPath = Path.Combine(dir, ".wedding-id");
+        return File.Exists(markerPath) && File.ReadAllText(markerPath).Trim() == weddingId.ToString();
+    }
+
+    /// <summary>Creates the wedding's folder (if needed) and stamps it with the owning weddingId.</summary>
+    private static void MarkWeddingDirOwnership(string weddingDir, int weddingId)
+    {
+        Directory.CreateDirectory(weddingDir);
+        File.WriteAllText(Path.Combine(weddingDir, ".wedding-id"), weddingId.ToString());
     }
 
     private async Task<List<WeddingDetail>> QueryPastDetailsAsync(List<int> personIds, int excludeWeddingId)
