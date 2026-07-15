@@ -39,7 +39,7 @@ public class AppDbContext : DbContext
             e.Property(p => p.Gender).HasConversion<int>();
             e.Property(p => p.FamilyGroup).HasMaxLength(200);
             e.Ignore(p => p.FullName);
-            e.HasIndex(p => new { p.FirstName, p.LastName }).IsUnique();
+            e.HasIndex(p => new { p.FirstName, p.LastName });
         });
 
         // ── SongCategory ───────────────────────────────────────────────────
