@@ -19,4 +19,11 @@ public class SongCategoriesController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateSongCategoryDto dto) =>
         Ok(await _songs.CreateCategoryAsync(dto));
+
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> Delete(int id)
+    {
+        await _songs.DeleteCategoryAsync(id);
+        return NoContent();
+    }
 }

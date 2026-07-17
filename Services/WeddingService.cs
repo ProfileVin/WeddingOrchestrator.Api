@@ -32,7 +32,7 @@ public class WeddingService : IWeddingService
         return weddings.Select(MapToListItemDto).ToList();
     }
 
-    public async Task<List<WeddingListItemDto>> CheckAvailabilityAsync(DateTime date, TimeOnly? startTime, TimeOnly? endTime)
+    public async Task<List<WeddingListItemDto>> CheckAvailabilityAsync(DateTime date)
     {
         var startOfDay = date.Date;
         var endOfDay   = startOfDay.AddDays(1);
@@ -41,14 +41,6 @@ public class WeddingService : IWeddingService
             .Include(w => w.Details).ThenInclude(d => d.Person)
             .Where(w => w.DateOfWedding >= startOfDay && w.DateOfWedding < endOfDay)
             .ToListAsync();
-
-        if (startTime.HasValue && endTime.HasValue)
-        {
-            weddings = weddings
-                .Where(w => w.StartTime == null || w.EndTime == null ||
-                            (startTime.Value < w.EndTime.Value && endTime.Value > w.StartTime.Value))
-                .ToList();
-        }
 
         return weddings.Select(MapToListItemDto).ToList();
     }
@@ -82,8 +74,6 @@ public class WeddingService : IWeddingService
         var wedding = new Wedding
         {
             DateOfWedding = dto.DateOfWedding,
-            StartTime = dto.StartTime,
-            EndTime = dto.EndTime,
             Location = dto.Location,
             IsFinalized = false,
             CreatedUtc = DateTime.Now,
@@ -131,6 +121,19 @@ public class WeddingService : IWeddingService
         await SyncPersonRelationshipsAsync(wedding.Id);
 
         return await GetByIdAsync(wedding.Id);
+    }
+
+    public async Task<WeddingDto> UpdateDetailsAsync(int id, UpdateWeddingDetailsDto dto)
+    {
+        var wedding = await _db.Weddings.FindAsync(id)
+            ?? throw new KeyNotFoundException($"Wedding {id} not found.");
+
+        wedding.DateOfWedding = dto.DateOfWedding;
+        wedding.Location = dto.Location;
+        wedding.UpdatedDate = DateTime.Now;
+
+        await _db.SaveChangesAsync();
+        return await GetByIdAsync(id);
     }
 
     public async Task<WeddingDto> UpdateRolesAsync(int id, WeddingFamilyTreeDto dto)

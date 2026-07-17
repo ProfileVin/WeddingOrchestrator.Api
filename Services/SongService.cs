@@ -48,6 +48,27 @@ public class SongService : ISongService
         return MapCategoryDto(category);
     }
 
+    public async Task DeleteCategoryAsync(int id)
+    {
+        var category = await _db.SongCategories
+            .Include(c => c.Songs)
+            .FirstOrDefaultAsync(c => c.Id == id)
+            ?? throw new KeyNotFoundException($"Category {id} not found.");
+
+        var absolutePaths = category.Songs
+            .Select(s => Path.Combine(_storageRoot, s.RelativeFilePath))
+            .ToList();
+
+        _db.SongCategories.Remove(category);
+        await _db.SaveChangesAsync();
+
+        foreach (var path in absolutePaths)
+        {
+            if (File.Exists(path))
+                File.Delete(path);
+        }
+    }
+
     public async Task<List<SongDto>> GetAllSongsAsync()
     {
         var songs = await _db.Songs

@@ -24,11 +24,8 @@ public class WeddingsController : ControllerBase
         Ok(await _weddings.GetAllAsync());
 
     [HttpGet("check-availability")]
-    public async Task<IActionResult> CheckAvailability(
-        [FromQuery] DateTime date,
-        [FromQuery] TimeOnly? startTime,
-        [FromQuery] TimeOnly? endTime) =>
-        Ok(await _weddings.CheckAvailabilityAsync(date, startTime, endTime));
+    public async Task<IActionResult> CheckAvailability([FromQuery] DateTime date) =>
+        Ok(await _weddings.CheckAvailabilityAsync(date));
 
     [HttpGet("{id:int}")]
     public async Task<IActionResult> GetById(int id) =>
@@ -40,6 +37,10 @@ public class WeddingsController : ControllerBase
         var result = await _weddings.CreateAsync(dto);
         return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
     }
+
+    [HttpPut("{id:int}")]
+    public async Task<IActionResult> UpdateDetails(int id, [FromBody] UpdateWeddingDetailsDto dto) =>
+        Ok(await _weddings.UpdateDetailsAsync(id, dto));
 
     [HttpPut("{id:int}/roles")]
     public async Task<IActionResult> UpdateRoles(int id, [FromBody] WeddingFamilyTreeDto dto) =>
