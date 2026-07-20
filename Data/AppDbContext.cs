@@ -123,7 +123,9 @@ public class AppDbContext : DbContext
             new RelationshipType { Id = 40, TypeCode = "GRANDSON_IN_LAW",       TypeLabel = "Grandson-in-law",       Category = "INLAW", GenerationDelta = -2 },
             new RelationshipType { Id = 41, TypeCode = "GRANDDAUGHTER_IN_LAW",  TypeLabel = "Granddaughter-in-law",  Category = "INLAW", GenerationDelta = -2 },
             new RelationshipType { Id = 42, TypeCode = "GRANDFATHER_IN_LAW",    TypeLabel = "Grandfather-in-law",    Category = "INLAW", GenerationDelta =  2 },
-            new RelationshipType { Id = 43, TypeCode = "GRANDMOTHER_IN_LAW",    TypeLabel = "Grandmother-in-law",    Category = "INLAW", GenerationDelta =  2 }
+            new RelationshipType { Id = 43, TypeCode = "GRANDMOTHER_IN_LAW",    TypeLabel = "Grandmother-in-law",    Category = "INLAW", GenerationDelta =  2 },
+            new RelationshipType { Id = 44, TypeCode = "EX_WIFE",               TypeLabel = "Ex Wife",               Category = "DIRECT", GenerationDelta =  0 },
+            new RelationshipType { Id = 45, TypeCode = "EX_HUSBAND",            TypeLabel = "Ex Husband",            Category = "DIRECT", GenerationDelta =  0 }
         );
 
         // ── WeddingDetail ──────────────────────────────────────────────────
