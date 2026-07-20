@@ -658,9 +658,9 @@ public class WeddingService : IWeddingService
     private async Task<int> FindOrCreatePersonByNameAsync(string name, Gender gender = Gender.Unknown)
     {
         var trimmed = name.Trim();
-        var parts = trimmed.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
-        var firstName = parts.Length > 0 ? parts[0] : trimmed;
-        var lastName = parts.Length > 1 ? parts[1] : string.Empty;
+        var words = trimmed.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var lastName = words.Length > 0 ? words[^1] : trimmed;
+        var firstName = words.Length > 1 ? string.Join(' ', words[..^1]) : string.Empty;
 
         var existing = await _db.People
             .FirstOrDefaultAsync(p => p.FirstName == firstName && p.LastName == lastName);
