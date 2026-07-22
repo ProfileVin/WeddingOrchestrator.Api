@@ -618,6 +618,7 @@ public class WeddingService : IWeddingService
             .Include(w => w.Details).ThenInclude(d => d.Person)
             .Include(w => w.Details).ThenInclude(d => d.Song!).ThenInclude(s => s.Category)
             .Include(w => w.Details).ThenInclude(d => d.WeddingRelationType)
+            .Include(w => w.Details).ThenInclude(d => d.RelatedToPerson)
             .Include(w => w.WeddingSongIntro)
             .Include(w => w.FatherMotherWeddingSongIntroGroom)
             .Include(w => w.FatherMotherWeddingSongIntroBride)
@@ -712,6 +713,11 @@ public class WeddingService : IWeddingService
         var weddingItselfNote = w.Details.FirstOrDefault(d => d.RoleType == RoleType.WeddingItself)?.Note;
         var forbiddenIds = conflictReport?.ForbiddenSongIds.ToHashSet() ?? new HashSet<int>();
 
+        var roleLabelByPersonId = w.Details
+            .Where(d => d.PersonId.HasValue && d.RoleType != RoleType.OtherRelation)
+            .GroupBy(d => d.PersonId!.Value)
+            .ToDictionary(g => g.Key, g => RoleHelper.GetLabel(g.First().RoleType));
+
         var availableWeddingIntroSongs = songsByCategory.Values
             .SelectMany(songs => songs.Select(s => new AvailableSongDto
             {
@@ -752,12 +758,12 @@ public class WeddingService : IWeddingService
             FatherMotherWeddingSongIntroBrideTitle = w.FatherMotherWeddingSongIntroBride?.Title,
             AvailableWeddingIntroSongs = availableWeddingIntroSongs,
             AvailableParentIntroSongs = availableParentIntroSongs,
-            Roles = w.Details.OrderBy(d => d.RoleType).Select(d => MapDetailDto(d, conflictReport, songsByCategory)).ToList(),
+            Roles = w.Details.OrderBy(d => d.RoleType).Select(d => MapDetailDto(d, conflictReport, songsByCategory, roleLabelByPersonId)).ToList(),
             ConflictReport = conflictReport
         };
     }
 
-    private static WeddingRoleDto MapDetailDto(WeddingDetail detail, ConflictReportDto? conflictReport, Dictionary<int, List<Song>> songsByCategory)
+    private static WeddingRoleDto MapDetailDto(WeddingDetail detail, ConflictReportDto? conflictReport, Dictionary<int, List<Song>> songsByCategory, Dictionary<int, string> roleLabelByPersonId)
     {
         var forbiddenIds = conflictReport?.ForbiddenSongIds.ToHashSet() ?? new HashSet<int>();
         var requiredSlots = RoleHelper.GetRequiredSlots(detail.RoleType);
@@ -804,6 +810,11 @@ public class WeddingService : IWeddingService
             PersonLastName = detail.Person?.LastName,
             InWeddingRelationTypeLabel = detail.WeddingRelationType?.TypeLabel,
             WeddingSide = detail.WeddingSide,
+            RelatedToPersonId = detail.RelatedToPersonId,
+            RelatedToPersonName = detail.RelatedToPerson?.FullName,
+            RelatedToRoleLabel = detail.RelatedToPersonId.HasValue && roleLabelByPersonId.TryGetValue(detail.RelatedToPersonId.Value, out var relatedLabel)
+                ? relatedLabel
+                : null,
             Note = detail.Note,
             SongAssignments = songAssignments,
             AvailableSongs = availableSongs
