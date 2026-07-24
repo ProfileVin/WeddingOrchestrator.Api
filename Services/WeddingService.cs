@@ -581,7 +581,7 @@ public class WeddingService : IWeddingService
         return (RoleHelper.GetLabel(roleType), detail.Song.RelativeFilePath, detail.Song.Title);
     }
 
-    public async Task<List<(string roleLabel, string personName, string songTitle, string filePath)>> GetCombinedExportDataAsync(int weddingId)
+    public async Task<List<(string roleLabel, string personName, string songTitle, string filePath, RoleType? roleType)>> GetCombinedExportDataAsync(int weddingId)
     {
         var wedding = await _db.Weddings
             .Include(w => w.WeddingSongIntro)
@@ -599,15 +599,17 @@ public class WeddingService : IWeddingService
 
         var result = details
             .Where(d => d.Song != null)
-            .Select(d => (RoleHelper.GetLabel(d.RoleType), d.Person?.FullName ?? string.Empty, d.Song!.Title, d.Song!.RelativeFilePath))
+            .Select(d => (RoleHelper.GetLabel(d.RoleType), d.Person?.FullName ?? string.Empty, d.Song!.Title, d.Song!.RelativeFilePath, (RoleType?)d.RoleType))
             .ToList();
 
+        // Intro tracks are ceremony cues, not a family member's personal song, so they carry no
+        // RoleType and render full-width outside the couple-pair rows (see DocxService).
         if (wedding.WeddingSongIntro != null)
-            result.Add(("Wedding Intro", string.Empty, wedding.WeddingSongIntro.Title, wedding.WeddingSongIntro.RelativeFilePath));
+            result.Add(("Wedding Intro", string.Empty, wedding.WeddingSongIntro.Title, wedding.WeddingSongIntro.RelativeFilePath, null));
         if (wedding.FatherMotherWeddingSongIntroGroom != null)
-            result.Add(("Father/Mother Groom Intro", string.Empty, wedding.FatherMotherWeddingSongIntroGroom.Title, wedding.FatherMotherWeddingSongIntroGroom.RelativeFilePath));
+            result.Add(("Father/Mother Groom Intro", string.Empty, wedding.FatherMotherWeddingSongIntroGroom.Title, wedding.FatherMotherWeddingSongIntroGroom.RelativeFilePath, null));
         if (wedding.FatherMotherWeddingSongIntroBride != null)
-            result.Add(("Father/Mother Bride Intro", string.Empty, wedding.FatherMotherWeddingSongIntroBride.Title, wedding.FatherMotherWeddingSongIntroBride.RelativeFilePath));
+            result.Add(("Father/Mother Bride Intro", string.Empty, wedding.FatherMotherWeddingSongIntroBride.Title, wedding.FatherMotherWeddingSongIntroBride.RelativeFilePath, null));
 
         return result;
     }

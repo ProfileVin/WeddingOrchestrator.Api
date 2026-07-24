@@ -24,6 +24,20 @@ public static class RoleHelper
         _ => role.ToString()
     };
 
+    // Master Performance combined doc: each row is a married couple, husband (left column)
+    // paired with wife (right column) — the groom & bride themselves, then each side's
+    // parents, then each side's grandparents, in this display order.
+    public static readonly (RoleType male, RoleType female)[] MasterPerformancePairs =
+    {
+        (RoleType.Groom, RoleType.Bride),
+        (RoleType.FatherOfGroom, RoleType.MotherOfGroom),
+        (RoleType.FatherOfBride, RoleType.MotherOfBride),
+        (RoleType.PaternalGrandfatherOfGroom, RoleType.PaternalGrandmotherOfGroom),
+        (RoleType.PaternalGrandfatherOfBride, RoleType.PaternalGrandmotherOfBride),
+        (RoleType.MaternalGrandfatherOfGroom, RoleType.MaternalGrandmotherOfGroom),
+        (RoleType.MaternalGrandfatherOfBride, RoleType.MaternalGrandmotherOfBride),
+    };
+
     // Returns the song category IDs needed for each slot.
     // slot 1 = primary/main, slot 2 = intro
     public static List<(int slot, int categoryId)> GetRequiredSlots(RoleType role) => role switch
